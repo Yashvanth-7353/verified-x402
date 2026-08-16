@@ -1,0 +1,1 @@
+"""Validation stages initialization."""
