@@ -85,6 +85,30 @@ class TestVerifyEndpointRepair:
         data = resp.json()
         assert data["result"]["outcome"] == "verified_repaired"
         assert data["result"]["repair_info"] is not None
+        assert data["result"]["repair_info"]["repair_type"] == "deterministic"
+        assert data["receipt"]["repair_summary_hash"] is not None
+
+    def test_semantic_repairable_request(self, client):
+        body = _make_payload(
+            output_payload={
+                "name": "Bob",
+                "inject_mock_semantic_repair": {"age": 25}
+            },
+            schema_definition={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = client.post("/api/v1/verify", json=body)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["result"]["repair_info"] is not None
+        assert data["result"]["repair_info"]["repair_type"] == "semantic"
         assert data["receipt"]["repair_summary_hash"] is not None
 
 
