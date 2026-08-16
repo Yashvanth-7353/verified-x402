@@ -29,12 +29,21 @@ class SchemaValidationStage(ValidationStage):
             path = ".".join([str(p) for p in error.absolute_path]) if error.absolute_path else "$"
             stage_enum = StageEnum.type if error.validator == "type" else StageEnum.schema
             
+            # Sanitize description to avoid leaking raw payload values.
+            # For type errors, report the expected type and field without the actual value.
+            if error.validator == "type":
+                description = f"Value at '{path}' is not of type '{error.schema.get('type', 'unknown')}'"
+            elif error.validator == "required":
+                description = error.message  # Safe: only mentions the property name
+            else:
+                description = f"Schema violation at '{path}': {error.validator}"
+
             findings.append(
                 ValidationFinding(
                     finding_id=uuid4(),
                     stage=stage_enum,
                     severity=Severity.blocking,
-                    description=error.message,
+                    description=description,
                     field_path=path,
                     repairable=Repairability.not_repairable
                 )
