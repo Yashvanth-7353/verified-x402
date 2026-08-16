@@ -1,0 +1,1 @@
+"""Cryptographic evidence layer initialization."""
