@@ -14,7 +14,8 @@ from x402.mechanisms.avm.exact import ExactAvmClientScheme
 from x402.mechanisms.avm.signer import ClientAvmSigner
 from x402.schemas import PaymentRequired
 
-from algosdk import encoding
+from algosdk import encoding, transaction
+
 
 class PrivateKeySigner(ClientAvmSigner):
     """
@@ -129,15 +130,27 @@ async def run_e2e_test():
         print("Creating payment payload (this will contact the GoPlausible facilitator and sign the tx)...")
         payment_payload = await x402_client.create_payment_payload(payment_required_model)
         
-        # Encode the payload for the X-PAYMENT header
-        x_payment_header = payment_payload.to_base64()
-        print(f"Generated X-PAYMENT header (first 50 chars): {x_payment_header[:50]}...")
+        # V2 x402 payloads MUST be sent as PAYMENT-SIGNATURE header, NOT X-PAYMENT.
+        # X-PAYMENT is V1 legacy only. The server's _extract_payment() reads PAYMENT-SIGNATURE.
+        encoded_payload = base64.b64encode(
+            payment_payload.model_dump_json(by_alias=True, exclude_none=True).encode()
+        ).decode("utf-8")
+        
+        # Determine the correct header name based on protocol version
+        if payment_payload.x402_version == 2:
+            payment_header_name = "PAYMENT-SIGNATURE"
+        else:
+            payment_header_name = "X-PAYMENT"
+        
+        print(f"x402 version: {payment_payload.x402_version}")
+        print(f"Using header: {payment_header_name}")
+        print(f"Encoded payload (first 50 chars): {encoded_payload[:50]}...")
         
         print("\n--- STEP 3: Retrying with payment ---")
         response2 = await client.post(
             api_url, 
             json=payload, 
-            headers={"X-PAYMENT": x_payment_header}
+            headers={payment_header_name: encoded_payload}
         )
         
         print(f"Status Code: {response2.status_code}")
@@ -145,9 +158,25 @@ async def run_e2e_test():
         if response2.status_code == 200:
             print("Success! Response:")
             print(json.dumps(response2.json(), indent=2))
+            # Print settlement header if present
+            payment_response = response2.headers.get("PAYMENT-RESPONSE")
+            if payment_response:
+                pr_json = base64.b64decode(payment_response).decode("utf-8")
+                pr_data = json.loads(pr_json)
+                txn_id = pr_data.get("transaction") or pr_data.get("txId")
+                print(f"\nReal Algorand Transaction ID: {txn_id}")
         else:
             print("Failed after payment!")
-            print(response2.text)
+            print(f"Response body: {response2.text}")
+            # Try to decode the 402 challenge body for the invalid_reason
+            payment_required_hdr = response2.headers.get("PAYMENT-REQUIRED")
+            if payment_required_hdr:
+                try:
+                    pr_json = base64.b64decode(payment_required_hdr).decode("utf-8")
+                    pr_data = json.loads(pr_json)
+                    print(f"\nFacilitator rejection reason: {pr_data.get('error', pr_data)}")
+                except Exception as decode_err:
+                    print(f"(Could not decode PAYMENT-REQUIRED header: {decode_err})")
             
 if __name__ == "__main__":
     asyncio.run(run_e2e_test())

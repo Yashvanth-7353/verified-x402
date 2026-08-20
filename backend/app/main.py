@@ -20,28 +20,55 @@ from x402.mechanisms.avm.exact import register_exact_avm_server
 from x402.http.middleware.fastapi import payment_middleware
 
 from app.core.config import settings
-from app.core.logging import setup_logging
+from typing import Any
 from app.core.errors import VerificationError, verification_error_handler
 from app.api.router import api_router
-
+from app.core.logging import logger, setup_logging
+app = FastAPI()
+# Initialize logging before any other code runs
 setup_logging()
+from x402.http import HTTPFacilitatorClient, RouteConfig, PaymentOption, FacilitatorConfig
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="Local-first verification layer for AI agents",
-    version="0.1.0",
-)
-
-# ---------------------------------------------------------------------------
-# x402 payment middleware — protects POST /api/v1/semantic-repair only
-# ---------------------------------------------------------------------------
-
-_facilitator_client = HTTPFacilitatorClient(
-    FacilitatorConfig(url=settings.FACILITATOR_URL)
-)
-
-_payment_server = x402ResourceServer(facilitator_clients=_facilitator_client)
+# Initialize x402 resource server and register AVM scheme
+facilitator = HTTPFacilitatorClient(FacilitatorConfig(url=settings.FACILITATOR_URL))
+_payment_server = x402ResourceServer(facilitator)
 register_exact_avm_server(_payment_server)
+# Register diagnostic hooks on the x402 resource server
+def _verify_failure_hook(context: Any) -> Any:
+    # Log verification failure details without exposing sensitive data
+    # VerifyFailureContext has: payment_payload, requirements, error (Exception)
+    try:
+        error = getattr(context, "error", None)
+        error_msg = str(error) if error is not None else "unknown"
+        logger.error(f"x402 verification failure: error={error_msg}")
+        try:
+            import json, os
+            log_path = os.path.join(os.path.dirname(__file__), "..", "payment_failure.log")
+            log_path = os.path.abspath(log_path)
+            with open(log_path, "a", encoding="utf-8") as f:
+                json.dump({"hook": "verify", "error": error_msg}, f)
+                f.write("\n")
+        except Exception as log_exc:
+            logger.exception(f"Failed to write verification failure log: {log_exc}")
+    except Exception as e:
+        logger.exception(f"Error in verification failure hook: {e}")
+    return context
+
+def _settle_failure_hook(context: Any) -> Any:
+    # Log settlement failure details safely
+    # SettleFailureContext has: payment_payload, requirements, error (Exception)
+    try:
+        error = getattr(context, "error", None)
+        error_msg = str(error) if error is not None else "unknown"
+        logger.error(f"x402 settlement failure: error={error_msg}")
+    except Exception as e:
+        logger.exception(f"Error in settlement failure hook: {e}")
+    return context
+
+# Attach the hooks to the server instance
+_payment_server.on_verify_failure(_verify_failure_hook)
+_payment_server.on_settle_failure(_settle_failure_hook)
+
 
 _semantic_repair_route_key = f"POST {settings.API_V1_STR}/semantic-repair"
 
@@ -49,8 +76,8 @@ _payment_routes = {
     _semantic_repair_route_key: RouteConfig(
         accepts=PaymentOption(
             scheme="exact",
-            pay_to=settings.AVM_ADDRESS,
-            price=AssetAmount(amount=settings.SEMANTIC_REPAIR_PRICE, asset="0"),
+            pay_to="GAVMWAOT52HYGQOPZAVYXA2NZHZX7DXRJYZQ5YVG4NXPQ3UUWLCHUBWVW4",
+            price=AssetAmount(amount=settings.SEMANTIC_REPAIR_PRICE, asset="10458941"),
             network=settings.ALGORAND_NETWORK,
         ),
         resource=f"{settings.API_V1_STR}/semantic-repair",
