@@ -218,7 +218,37 @@ For each of: facilitator unreachable, Algorand network unreachable, semantic-rep
 | 17 | Real E2E: signed receipt after x402 payment | Signature present and valid |
 | 18 | Real E2E: signed receipt after Merkle anchoring | Signature preserved in anchored record |
 
-## 15. Out of Scope for MVP Testing
+## 15. Independent Receipt Verification Test Scenarios (Phase 13)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Verify valid signed receipt with public key | VALID |
+| 2 | Verify with wrong public key | INVALID |
+| 3 | Verify receipt without signature | INVALID (no authenticity proof) |
+| 4 | Verify receipt with malformed signature hex | INVALID |
+| 5 | Verify receipt with modified request_id | INVALID |
+| 6 | Verify receipt with modified receipt_id | INVALID |
+| 7 | Verify receipt with modified outcome | INVALID |
+| 8 | Verify receipt with modified output_hash | INVALID |
+| 9 | Verify receipt with modified schema | INVALID |
+| 10 | Verify receipt with modified validator_version | INVALID |
+| 11 | Verify receipt with modified issued_at | INVALID |
+| 12 | Verify receipt with modified signature | INVALID |
+| 13 | Verify receipt with modified signing_key_id | Signature still valid (excluded from signable content) |
+| 14 | Verify receipt with modified receipt_hash | Hash invalid, signature still valid (excluded from signable content) |
+| 15 | Verify receipt without private key in environment | VALID (independent) |
+| 16 | Verify receipt without SQLite access | VALID (independent) |
+| 17 | Verify receipt without backend server | VALID (independent) |
+| 18 | Verify receipt after JSON roundtrip | VALID |
+| 19 | Verify receipt with extra field added | INVALID (changes canonical form) |
+| 20 | Verify receipt with optional field removed | INVALID (changes canonical form) |
+| 21 | CLI verifier: valid receipt | Exit 0, prints VALID |
+| 22 | CLI verifier: tampered receipt | Exit 1, prints INVALID |
+| 23 | GET /api/v1/receipt/public-key | Returns algorithm, key_id, public_key |
+| 24 | POST /api/v1/receipt/verify with valid receipt | valid=true |
+| 25 | POST /api/v1/receipt/verify with tampered receipt | valid=false |
+
+## 16. Out of Scope for MVP Testing
 
 Per PRD.md's MVP scope, the following are **not** required test coverage for the hackathon MVP (candidates for future scope):
 - Load/performance/throughput testing (no performance targets are defined in this document set — PRD.md §9).

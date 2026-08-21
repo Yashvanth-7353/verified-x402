@@ -176,13 +176,25 @@ RECEIPT_SIGNING_PRIVATE_KEY=<private-key-b64>
 RECEIPT_SIGNING_PUBLIC_KEY=<public-key-b64>
 ```
 
-### Independent verification:
+### Independent verification (API):
 ```bash
 POST /api/v1/receipt/verify
 {"receipt": {<signed receipt JSON>}}
 ```
 
-Returns `{"receipt_valid": true, "signature_valid": true, ...}`.
+Returns `{"valid": true, "signature_valid": true, ...}`.
+
+### Independent verification (CLI — no server needed):
+```bash
+python scripts/verify_receipt.py receipt.json --public-key <base64-key>
+```
+
+### Get the public verification key:
+```bash
+GET /api/v1/receipt/public-key
+```
+
+Returns `{"algorithm": "Ed25519", "key_id": "...", "public_key": "..."}`.
 
 ## 14. Verifying Merkle Proofs
 

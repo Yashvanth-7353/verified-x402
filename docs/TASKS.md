@@ -149,7 +149,20 @@ Depends on: Milestone 5 (receipts), Milestone 6 (records).
 - [x] Signed receipts persisted in SQLite.
 - [x] Independent verification with only public key (no private key needed).
 
-## 13. Optional / Future Scope Tasks (Explicitly Not MVP)
+## 13. Milestone 11 — Independent Receipt Verification ✅ Phase 13 complete
+
+Depends on: Milestone 10 (receipt signing).
+
+- [x] `backend/app/crypto/verify.py` — standalone `ReceiptVerifier` (public-key-only, no private key).
+- [x] `scripts/verify_receipt.py` — CLI verifier (no backend, no SQLite, no private key).
+- [x] `GET /api/v1/receipt/public-key` — public key distribution endpoint.
+- [x] 38 Phase 13 tests (independent verification, tamper detection, no-private-key, no-SQLite, no-backend).
+- [x] Signed-field specification documented.
+- [x] Receipt hash integrity check (separate from signature).
+- [x] JSON roundtrip verification.
+- [x] CLI exits 0 for valid, 1 for invalid.
+
+## 14. Optional / Future Scope Tasks (Explicitly Not MVP)
 
 - [ ] Multi-agent/multi-tenant policy isolation (PRD.md §11).
 - [ ] Semantic-repair provider marketplace / multiple providers (PRD.md §11).
