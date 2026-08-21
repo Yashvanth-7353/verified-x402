@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import health, verify, semantic, anchor
+from app.api import health, verify, semantic, anchor, receipt
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -18,4 +18,9 @@ api_router.include_router(
     anchor.router,
     prefix=settings.API_V1_STR,
     tags=["anchoring"],
+)
+api_router.include_router(
+    receipt.router,
+    prefix=settings.API_V1_STR,
+    tags=["receipt-verification"],
 )

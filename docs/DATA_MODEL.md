@@ -121,7 +121,7 @@ The externally shareable, cryptographically bound artifact produced for every re
 | validator_version | string | Copied from VerificationResult |
 | issued_at | timestamp | |
 | receipt_hash | hash | Hash over the full receipt content itself — this is the value that enters the Merkle tree |
-| signature | opaque (optional/TBD) | Whether/how receipts are signed locally is an implementation decision — TBD |
+| signature | string (optional) | Ed25519 signature (hex-encoded) over canonical receipt content. Added by Phase 12. |
 
 **Design note:** the receipt intentionally does not embed the raw output payload or raw repair diff — only hashes — so that receipts can be freely shared, logged, or included in Merkle proofs without leaking payload content (Architecture Principle 6).
 
@@ -176,5 +176,5 @@ Per the constraint against inventing unspecified technology, this data model doe
 - A specific database engine or storage format (relational, document, key-value — all are compatible with the entities above).
 - A specific hash algorithm (marked TBD wherever `hash` type appears).
 - A specific schema description language (`schema_definition` is intentionally opaque).
-- A specific signature scheme for receipts (`signature` field marked optional/TBD).
+- ~~A specific signature scheme for receipts~~ **RESOLVED (Phase 12):** Ed25519 signing via dedicated key pair. |
 - A specific pricing/asset representation for payments (`amount_and_asset` intentionally opaque).

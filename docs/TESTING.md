@@ -195,7 +195,30 @@ For each of: facilitator unreachable, Algorand network unreachable, semantic-rep
 - Presented with a `verified` receipt but a *different* output than the one the receipt's `output_hash` covers → refuses (mismatch detection).
 - Presented with a malformed/tampered receipt (hash does not recompute correctly) → refuses.
 
-## 14. Out of Scope for MVP Testing
+## 14. Cryptographic Receipt Signing Test Scenarios (Phase 12)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Generate Ed25519 keypair | Valid 32-byte keypair |
+| 2 | Sign a valid receipt | Signature, algorithm, key_id populated |
+| 3 | Verify with correct public key | VALID |
+| 4 | Verify with wrong public key | INVALID |
+| 5 | Verify receipt with modified outcome | INVALID |
+| 6 | Verify receipt with modified output_hash | INVALID |
+| 7 | Verify receipt with modified request_id | INVALID |
+| 8 | Verify receipt with modified schema | INVALID |
+| 9 | Verify receipt with modified validator_version | INVALID |
+| 10 | Verify unsigned receipt | No signature (not invalid, just unsigned) |
+| 11 | Same receipt → same signature | Deterministic |
+| 12 | Different receipt → different signature | Collision-resistant |
+| 13 | receipt_hash excludes signature fields | Receipt hash unchanged by signing |
+| 14 | Signed receipt persisted in SQLite | Signature survives serialization roundtrip |
+| 15 | Private key never in receipt/API/logs | Security property |
+| 16 | Disabled signer produces unsigned receipt | Graceful degradation |
+| 17 | Real E2E: signed receipt after x402 payment | Signature present and valid |
+| 18 | Real E2E: signed receipt after Merkle anchoring | Signature preserved in anchored record |
+
+## 15. Out of Scope for MVP Testing
 
 Per PRD.md's MVP scope, the following are **not** required test coverage for the hackathon MVP (candidates for future scope):
 - Load/performance/throughput testing (no performance targets are defined in this document set — PRD.md §9).

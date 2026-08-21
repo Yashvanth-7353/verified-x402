@@ -142,6 +142,8 @@ def _make_receipt(request_id: str, outcome: VerificationOutcome, receipt_hash: s
         r_dict = r.model_dump(mode="json")
         r_dict.pop("receipt_hash", None)
         r_dict.pop("signature", None)
+        r_dict.pop("signature_algorithm", None)
+        r_dict.pop("signing_key_id", None)
         r.receipt_hash = hash_data(r_dict)
     return r
 

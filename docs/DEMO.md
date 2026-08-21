@@ -160,7 +160,31 @@ After a successful demo, verify transactions on TestNet explorer:
 
 TestNet explorer: https://testnet.explorer.perawallet.app/
 
-## 13. Verifying Merkle Proofs
+## 13. Receipt Signing (Phase 12)
+
+All receipts are cryptographically signed using Ed25519 when `RECEIPT_SIGNING_PRIVATE_KEY` is configured.
+
+### Generate a signing key:
+```bash
+cd backend
+python scripts/generate_receipt_signing_key.py
+```
+
+### Add to `.env`:
+```bash
+RECEIPT_SIGNING_PRIVATE_KEY=<private-key-b64>
+RECEIPT_SIGNING_PUBLIC_KEY=<public-key-b64>
+```
+
+### Independent verification:
+```bash
+POST /api/v1/receipt/verify
+{"receipt": {<signed receipt JSON>}}
+```
+
+Returns `{"receipt_valid": true, "signature_valid": true, ...}`.
+
+## 14. Verifying Merkle Proofs
 
 The demo script automatically verifies inclusion proofs. To verify manually:
 
@@ -173,7 +197,7 @@ proof = generate_proof(tree, leaf_index)
 valid = verify_proof(leaves[leaf_index], proof, tree.root, leaf_index)
 ```
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
@@ -184,7 +208,7 @@ valid = verify_proof(leaves[leaf_index], proof, tree.root, leaf_index)
 | `Merkle anchoring 503` | Set `ANCHOR_PRIVATE_KEY` in `.env` |
 | `Receipt hash mismatch` | Database corruption — delete `data/verified.db` |
 
-## 15. Test Suite
+## 16. Test Suite
 
 ```bash
 # Run all tests (no network required)

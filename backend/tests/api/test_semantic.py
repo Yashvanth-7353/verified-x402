@@ -849,6 +849,8 @@ class TestReceiptTamperDetection:
             check = dict(receipt)
             check.pop("receipt_hash", None)
             check.pop("signature", None)
+            check.pop("signature_algorithm", None)
+            check.pop("signing_key_id", None)
             assert receipt["receipt_hash"] == hash_data(check)
 
     def test_output_hash_matches_final_payload(self, free_client):

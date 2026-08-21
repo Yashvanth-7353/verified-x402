@@ -17,8 +17,22 @@ from app.models.verification import (
 )
 from app.models.enums import VerificationOutcome
 from app.evidence.hasher import hash_data
+from app.crypto.signing import ReceiptSigner
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Module-level signer (initialized lazily)
+_signer: ReceiptSigner | None = None
+
+
+def _get_signer() -> ReceiptSigner:
+    global _signer
+    if _signer is None:
+        _signer = ReceiptSigner(
+            private_key_b64=settings.RECEIPT_SIGNING_PRIVATE_KEY or None
+        )
+    return _signer
 
 
 class ReceiptService:
@@ -31,6 +45,9 @@ class ReceiptService:
     - call the semantic-repair API
     - perform payment verification
     - talk to the facilitator
+
+    Phase 12: Receipts are cryptographically signed using Ed25519
+    if a signing key is configured.
     """
 
     def generate_receipt(
@@ -108,7 +125,32 @@ class ReceiptService:
         receipt_dict = receipt.model_dump(mode="json")
         receipt_dict.pop("receipt_hash", None)
         receipt_dict.pop("signature", None)
+        receipt_dict.pop("signature_algorithm", None)
+        receipt_dict.pop("signing_key_id", None)
         receipt.receipt_hash = hash_data(receipt_dict)
+
+        # ---- Phase 12: Cryptographic signing ----
+        signer = _get_signer()
+        if signer.enabled:
+            # Rebuild receipt dict with receipt_hash but without signature fields
+            receipt_dict = receipt.model_dump(mode="json")
+            receipt_dict.pop("signature", None)
+            receipt_dict.pop("signature_algorithm", None)
+            receipt_dict.pop("signing_key_id", None)
+
+            # Sign the receipt (adds signature fields to dict)
+            signed_dict = signer.sign_receipt(receipt_dict)
+
+            # Update receipt with signature metadata
+            receipt.signature = signed_dict.get("signature")
+            receipt.signature_algorithm = signed_dict.get("signature_algorithm")
+            receipt.signing_key_id = signed_dict.get("signing_key_id")
+
+            logger.debug(
+                "Receipt signed: key_id=%s algorithm=%s",
+                receipt.signing_key_id,
+                receipt.signature_algorithm,
+            )
 
         logger.debug(
             "Receipt generated: receipt_id=%s outcome=%s output_hash=%s... receipt_hash=%s...",
@@ -136,11 +178,14 @@ class ReceiptService:
         2. output_hash matches the final payload
         3. repair_summary_hash matches RepairInfo (if present)
         4. Basic identifiers match (request_id, schema, outcome)
+        5. Signature is valid (if present)
         """
         # 1. Verify receipt hash itself
         receipt_dict = receipt.model_dump(mode="json")
         receipt_dict.pop("receipt_hash", None)
         receipt_dict.pop("signature", None)
+        receipt_dict.pop("signature_algorithm", None)
+        receipt_dict.pop("signing_key_id", None)
         expected_receipt_hash = hash_data(receipt_dict)
 
         if receipt.receipt_hash != expected_receipt_hash:

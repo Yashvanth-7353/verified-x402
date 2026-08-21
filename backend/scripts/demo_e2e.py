@@ -307,6 +307,8 @@ def run_offline_demo():
         receipt_dict = dict(receipt)
         receipt_dict.pop("receipt_hash", None)
         receipt_dict.pop("signature", None)
+        receipt_dict.pop("signature_algorithm", None)
+        receipt_dict.pop("signing_key_id", None)
         computed_hash = hash_data(receipt_dict)
         hash_valid = computed_hash == receipt["receipt_hash"]
 
@@ -610,6 +612,8 @@ def run_real_demo():
     rd = dict(receipt)
     rd.pop("receipt_hash", None)
     rd.pop("signature", None)
+    rd.pop("signature_algorithm", None)
+    rd.pop("signing_key_id", None)
     computed = hash_data(rd)
     valid = computed == receipt["receipt_hash"]
     detail("Receipt hash", receipt["receipt_hash"][:16] + "...",

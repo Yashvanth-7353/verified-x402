@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     ANCHOR_ALGOD_TOKEN: str = ""  # Algod API token (empty for public nodes)
     MERKLE_BATCH_SIZE: int = 10  # Max records per anchor batch
 
+    # Phase 12: Receipt Signing (Ed25519)
+    RECEIPT_SIGNING_PRIVATE_KEY: str = ""  # Base64-encoded Ed25519 private key (32 bytes)
+    RECEIPT_SIGNING_PUBLIC_KEY: str = ""   # Base64-encoded Ed25519 public key (for verification)
+
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
     @property

@@ -132,7 +132,24 @@ Depends on: Milestones 1–8.
 - [x] Failure path tests (payment failure, repair failure, anchoring failure).
 - [x] `docs/DEMO.md` setup and usage guide.
 
-## 12. Optional / Future Scope Tasks (Explicitly Not MVP)
+## 12. Milestone 10 — Cryptographic Receipt Signing ✅ Phase 12 complete
+
+Depends on: Milestone 5 (receipts), Milestone 6 (records).
+
+- [x] Ed25519 signing algorithm selected (PyNaCl, compatible with Algorand ecosystem).
+- [x] Dedicated signing key separate from payer/anchor wallets.
+- [x] `backend/app/crypto/signing.py` — ReceiptSigner service (sign + verify).
+- [x] `VerificationReceipt` model extended with `signature`, `signature_algorithm`, `signing_key_id`.
+- [x] ReceiptService signs receipts after generation (receipt_hash computed first, then signed).
+- [x] `receipt_hash` excludes signature fields (preserves Merkle anchoring compatibility).
+- [x] `POST /api/v1/receipt/verify` endpoint for independent verification.
+- [x] Key generation script `scripts/generate_receipt_signing_key.py`.
+- [x] Configuration: `RECEIPT_SIGNING_PRIVATE_KEY`, `RECEIPT_SIGNING_PUBLIC_KEY` env vars.
+- [x] 25 Phase 12 tests (key generation, signing, verification, tamper detection, determinism, security).
+- [x] Signed receipts persisted in SQLite.
+- [x] Independent verification with only public key (no private key needed).
+
+## 13. Optional / Future Scope Tasks (Explicitly Not MVP)
 
 - [ ] Multi-agent/multi-tenant policy isolation (PRD.md §11).
 - [ ] Semantic-repair provider marketplace / multiple providers (PRD.md §11).

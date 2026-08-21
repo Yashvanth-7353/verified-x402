@@ -174,4 +174,7 @@ class TestVerifyEndpointReceipt:
         data = resp.json()
         receipt = data["receipt"]
         assert receipt["receipt_hash"] != ""
-        assert receipt["signature"] is None
+        # Phase 12: signature may be present (if signing key configured) or None
+        if receipt["signature"] is not None:
+            assert receipt["signature_algorithm"] == "Ed25519"
+            assert receipt["signing_key_id"] is not None
