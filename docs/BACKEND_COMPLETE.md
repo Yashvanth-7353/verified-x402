@@ -12,33 +12,34 @@
 2. [High-Level Architecture](#2-high-level-architecture)
 3. [Technology Stack](#3-technology-stack)
 4. [Complete Phase History](#4-complete-phase-history)
-5. [Phase 7 — x402 Payment Integration](#5-phase-7--x402-payment-integration)
-6. [Phase 8 — Receipts, Integrity, Payment Metadata](#6-phase-8--receipts-integrity-payment-metadata)
-7. [Phase 9 — SQLite Persistence](#7-phase-9--sqlite-persistence)
-8. [Phase 10 — Merkle Anchoring](#8-phase-10--merkle-anchoring)
-9. [Phase 11 — Real E2E Demo](#9-phase-11--real-e2e-demo)
-10. [Phase 12 — Ed25519 Receipt Signing](#10-phase-12--ed25519-receipt-signing)
-11. [Phase 13 — Independent Verification](#11-phase-13--independent-verification)
-12. [Phase 14 — Backend Hardening](#12-phase-14--backend-hardening)
-13. [Complete API Reference](#13-complete-api-reference)
-14. [Complete Data Model](#14-complete-data-model)
-15. [Payment Configuration](#15-payment-configuration)
-16. [Environment Configuration](#16-environment-configuration)
-17. [Setup From Zero](#17-setup-from-zero)
-18. [Wallet / Algorand Setup](#18-wallet--algorand-setup)
-19. [How to Run the Backend](#19-how-to-run-the-backend)
-20. [How to Run the Test Suite](#20-how-to-run-the-test-suite)
-21. [How to Run the Offline Demo](#21-how-to-run-the-offline-demo)
-22. [How to Run the Real Demo](#22-how-to-run-the-real-demo)
-23. [Complete Feature Demonstration Checklist](#23-complete-feature-demonstration-checklist)
-24. [Complete Real E2E Walkthrough](#24-complete-real-e2e-walkthrough)
-25. [Troubleshooting History](#25-troubleshooting-history)
-26. [Security Model](#26-security-model)
-27. [What is Real vs. Mocked](#27-what-is-real-vs-mocked)
-28. [Testing Matrix](#28-testing-matrix)
-29. [Real TestNet Evidence](#29-real-testnet-evidence)
-30. [Frontend Handoff](#30-frontend-handoff)
-31. [Current Backend Status](#31-current-backend-status)
+5. [Phases 1–6 — Foundational Development](#5-phases-1-6-foundational-development)
+6. [Phase 7 — x402 Payment Integration](#6-phase-7-x402-payment-integration)
+7. [Phase 8 — Receipts, Integrity, Payment Metadata](#7-phase-8-receipts-integrity-payment-metadata)
+8. [Phase 9 — SQLite Persistence](#8-phase-9-sqlite-persistence)
+9. [Phase 10 — Merkle Anchoring](#9-phase-10-merkle-anchoring)
+10. [Phase 11 — Real E2E Demo](#10-phase-11-real-e2e-demo)
+11. [Phase 12 — Ed25519 Receipt Signing](#11-phase-12-ed25519-receipt-signing)
+12. [Phase 13 — Independent Verification](#12-phase-13-independent-verification)
+13. [Phase 14 — Backend Hardening](#13-phase-14-backend-hardening)
+14. [Complete API Reference](#14-complete-api-reference)
+15. [Complete Data Model](#15-complete-data-model)
+16. [Payment Configuration](#16-payment-configuration)
+17. [Environment Configuration](#17-environment-configuration)
+18. [Setup From Zero](#18-setup-from-zero)
+19. [Wallet / Algorand Setup](#19-wallet-algorand-setup)
+20. [How to Run the Backend](#20-how-to-run-the-backend)
+21. [How to Run the Test Suite](#21-how-to-run-the-test-suite)
+22. [How to Run the Offline Demo](#22-how-to-run-the-offline-demo)
+23. [How to Run the Real Demo](#23-how-to-run-the-real-demo)
+24. [Complete Feature Demonstration Checklist](#24-complete-feature-demonstration-checklist)
+25. [Complete Real E2E Walkthrough](#25-complete-real-e2e-walkthrough)
+26. [Troubleshooting History](#26-troubleshooting-history)
+27. [Security Model](#27-security-model)
+28. [What is Real vs. Mocked](#28-what-is-real-vs-mocked)
+29. [Testing Matrix](#29-testing-matrix)
+30. [Real TestNet Evidence](#30-real-testnet-evidence)
+31. [Frontend Handoff](#31-frontend-handoff)
+32. [Current Backend Status](#32-current-backend-status)
 
 ---
 
@@ -229,7 +230,7 @@ Escalation Decision
 | Phase | Name | Status | Tests Added |
 |-------|------|--------|-------------|
 | 7 | x402 Payment Integration | ✅ Complete | — |
-| 8 | Receipt Hardening & Payment Metadata | ✅ Complete | 25 new |
+| 8 | Receipt Hardening & Payment Metadata | ✅ Complete | 28 new |
 | 9 | SQLite Local Record Store | ✅ Complete | 30 new |
 | 10 | Merkle Anchoring | ✅ Complete | 39 new |
 | 11 | Real E2E Demo | ✅ Complete | 5 new |
@@ -241,7 +242,355 @@ Escalation Decision
 
 ---
 
-## 5. Phase 7 — x402 Payment Integration
+## 5. Phases 1–6 — Foundational Development
+
+> **Historical-source note:** The original Phase 1–6 execution reports were created outside the current ChatGPT workspace and are not present in the uploaded `BACKEND_COMPLETE.md`. The repository's surviving planning/design artifacts do preserve the foundational implementation contracts, architecture, and milestone definitions.  
+>
+> Therefore, the six sections below document the **grounded foundational work recoverable from the surviving project artifacts**. They are intentionally not presented as an exact reconstruction of the original Phase 1–6 challenge logs. Exact historical problems/commits/tests from those phases should only be added when the original Phase 1–6 reports are available.
+
+### Phase 1 — Foundational Decisions and Cryptographic Primitives
+
+#### Objective
+
+Establish the core rules that every later backend component depends on:
+
+- deterministic serialization
+- cryptographic hashing
+- request/result/receipt identity
+- fail-closed behavior
+- privacy boundaries
+- stable validation/repair contracts
+
+#### Implementation established
+
+- SHA-256 was selected for output, repair-summary, and receipt hashing.
+- Canonical JSON serialization uses sorted keys and compact separators.
+- A custom canonical encoder handles project data types such as UUIDs, datetimes, enums, and Pydantic models.
+- The system treats hashes as bindings rather than as encryption.
+- Verification is designed to be deterministic for identical inputs and policy/version combinations.
+- Repaired outputs are never trusted automatically; they must return through the same validation contract.
+
+The later Phase 8 implementation explicitly records SHA-256 and the compact sorted-key canonicalization as decisions established in the original foundation work.
+
+#### Important architectural decisions
+
+- Validation stages produce findings; centralized decision logic determines whether the request passes, is repaired, escalated, or rejected.
+- Deterministic repair must be pure and reproducible.
+- Semantic-repair output is untrusted until re-validation.
+- Raw payload content must not cross the local trust boundary unnecessarily.
+- The downstream execution boundary is responsible for requiring a valid receipt before acting.
+
+---
+
+### Phase 2 — Local Validation Pipeline
+
+#### Objective
+
+Build the local verification engine that can inspect structured AI output without requiring a network call.
+
+#### Pipeline
+
+```text
+Verification Request
+        ↓
+Ingestion / normalization
+        ↓
+Privacy pre-check
+        ↓
+Schema validation
+        ↓
+Type checking
+        ↓
+Syntax checking
+        ↓
+SQL safety checking
+        ↓
+ValidationFinding aggregation
+```
+
+#### Implemented responsibilities
+
+The architecture defines the local pipeline as:
+
+1. **Ingestion** — normalize the incoming verification request.
+2. **Privacy Filter** — run before escalation decisions so sensitive content is not accidentally forwarded.
+3. **Schema Validator** — validate the output against the referenced schema/policy.
+4. **Type Checker** — validate field-level types.
+5. **Syntax Checker** — validate code-like outputs such as SQL/function-call arguments.
+6. **SQL Safety Checker** — identify unsafe statement classes.
+7. **Finding aggregation** — collect findings from the independent stages.
+
+Each validation stage has a narrow responsibility and does not itself decide the final outcome.
+
+#### Important behavior
+
+- A valid payload can pass locally without payment.
+- Missing/invalid structure creates findings rather than being silently accepted.
+- Unsafe SQL is never silently rewritten into a different query.
+- Privacy filtering runs before any external escalation.
+- The same validation pipeline is reused for re-validation after repair.
+
+---
+
+### Phase 3 — Deterministic Repair and Escalation Decision
+
+#### Objective
+
+Introduce safe local repair while preventing the system from making semantic guesses.
+
+#### Deterministic repair principles
+
+Deterministic repair is limited to changes that are:
+
+- unambiguous
+- rule-derived from schema/policy
+- reproducible
+- local
+- free of external model inference
+
+The architecture permits categories such as:
+
+- lossless type coercion when explicitly safe
+- structural/format normalization
+- filling explicitly declared schema defaults
+
+The architecture explicitly excludes:
+
+- guessing user intent
+- ambiguous value selection
+- silently rewriting unsafe SQL
+- any repair requiring semantic judgment
+
+#### Escalation decision
+
+After validation and deterministic repair, unresolved blocking findings are classified into:
+
+```text
+deterministic
+semantic
+not_repairable
+```
+
+The decision logic determines the next stage.
+
+```text
+No blocking findings
+        ↓
+      PASS
+
+Blocking finding
+        ↓
+Deterministic repair possible?
+   ┌───────────────┐
+   │ YES           │
+   ↓               │
+Repair → Revalidate│
+                   │
+   NO              ↓
+        Semantic repair eligible?
+             ┌───────────────┐
+             │ YES           │ NO
+             ↓               ↓
+          Escalate        Reject
+```
+
+#### Key invariant
+
+A repaired payload is never considered valid merely because a repair function returned it. It must pass the validation pipeline again.
+
+---
+
+### Phase 4 — Semantic-Repair Escalation Pipeline
+
+#### Objective
+
+Add the external semantic-repair path for issues that cannot be resolved safely using deterministic rules.
+
+#### Flow
+
+```text
+Local validation
+      ↓
+Deterministic repair attempt
+      ↓
+Unresolved semantic finding
+      ↓
+Privacy-filtered payload
+      ↓
+Semantic Repair Provider
+      ↓
+Candidate repaired output
+      ↓
+FULL LOCAL RE-VALIDATION
+      ↓
+verified_repaired / rejected
+```
+
+#### Important implementation rules
+
+- Only the minimum privacy-filtered payload is eligible to leave the local boundary.
+- Semantic repair is not trusted by default.
+- A candidate repair must pass the same validation pipeline used for the original output.
+- Successful re-validation produces `verified_repaired`.
+- Failed re-validation produces `rejected`.
+- Provider/network failure is fail-closed.
+- Semantic repair does not bypass SQL safety or other local validation rules.
+
+#### MVP provider
+
+The current MVP uses `MockSemanticProvider` as the semantic-repair provider.
+
+This is an intentional application-level architecture decision. It is not a mock of:
+
+- x402 payment
+- GoPlausible
+- Algorand settlement
+- Algorand anchoring
+
+Those infrastructure components are real in the real E2E path.
+
+---
+
+### Phase 5 — Verification Receipts, Hashing, and Outcome Model
+
+#### Objective
+
+Create a stable cryptographic artifact representing the result of verification.
+
+#### Outcome model
+
+The backend distinguishes:
+
+| Outcome | Meaning |
+|---|---|
+| `verified` | Original output passed validation without semantic repair |
+| `verified_repaired` | Output was repaired and then passed full re-validation |
+| `rejected` | Output remained unsafe/invalid or the flow failed closed |
+
+#### Receipt responsibilities
+
+The receipt binds the verification event to:
+
+- request identity
+- verification outcome
+- final output hash
+- schema reference/version
+- validator version
+- repair information where applicable
+- issuance time
+- receipt hash
+
+#### Hashing
+
+The foundation established:
+
+```text
+Python object
+    ↓
+Canonical JSON
+    ↓
+SHA-256
+    ↓
+Deterministic hash
+```
+
+The later receipt implementation verifies that:
+
+- identical receipt content produces the same hash
+- changing a bound field changes the hash
+- `output_hash` refers to the FINAL validated output
+- `repair_summary_hash` exists when repair occurred
+
+This receipt layer became the dependency for later SQLite persistence and Merkle anchoring.
+
+---
+
+### Phase 6 — Backend Integration Baseline Before Payment Hardening
+
+#### Objective
+
+Bring the foundational validation, repair, receipt, and API layers together into a working backend baseline before the x402-specific hardening work documented in Phase 7.
+
+#### Integrated flow
+
+```text
+HTTP Request
+    ↓
+FastAPI API
+    ↓
+VerificationRequest / Policy
+    ↓
+Local validation
+    ↓
+Deterministic repair if eligible
+    ↓
+Re-validation
+    ↓
+Semantic escalation when required
+    ↓
+VerificationResult
+    ↓
+VerificationReceipt
+```
+
+#### Established backend contracts
+
+The surviving project design defines the following as stable contracts:
+
+- `VerificationRequest`
+- `VerificationResult`
+- `ValidationFinding`
+- `RepairInfo`
+- `VerificationReceipt`
+- `PaymentMetadata`
+- schema/policy references
+- receipt/output hashes
+- fail-closed rejection behavior
+
+#### Privacy boundary
+
+The backend was designed so that:
+
+- local validation happens before external calls
+- privacy filtering happens before escalation
+- raw payloads are not placed on-chain
+- external infrastructure receives only what its role requires
+- receipts use cryptographic bindings rather than exposing unnecessary internal data
+
+#### Execution-gating model
+
+The project establishes:
+
+> **No valid proof, no execution.**
+
+The receipt is the trusted artifact used by the downstream execution boundary. A rejected receipt must never authorize execution, and a receipt for a different output must fail the `output_hash` binding check.
+
+#### Transition into Phase 7
+
+At the end of the foundational implementation, the remaining major integration challenge was the paid semantic-repair path.
+
+Phase 7 therefore introduced the real x402 payment gate, GoPlausible facilitator integration, and Algorand TestNet settlement.
+
+---
+
+### Historical Challenges: What Can and Cannot Be Claimed
+
+The surviving artifacts support the following foundational challenges/design constraints:
+
+- choosing a deterministic hashing/canonicalization scheme
+- separating validation-stage findings from centralized escalation decisions
+- preventing deterministic repair from becoming semantic guessing
+- enforcing re-validation after every repair
+- maintaining a privacy boundary before escalation
+- keeping unsafe SQL from being silently rewritten
+- making receipts the externally trusted artifact
+- enforcing fail-closed behavior
+
+However, the **exact Phase 1–6 debugging chronology, individual errors, commit-level file changes, and original per-phase test counts are not recoverable from the current documentation set**. They should not be fabricated in this master document.
+
+---
+
+## 6. Phase 7 — x402 Payment Integration
 
 ### Objective
 Integrate real x402 payment gating with GoPlausible AVM facilitator on Algorand TestNet.
@@ -288,7 +637,7 @@ Integrate real x402 payment gating with GoPlausible AVM facilitator on Algorand 
 
 ---
 
-## 6. Phase 8 — Receipts, Integrity, Payment Metadata
+## 7. Phase 8 — Receipts, Integrity, Payment Metadata
 
 ### Objective
 Harden VerificationReceipt so every request produces a correct, cryptographically bound receipt, and semantic repair receipts correctly reference the settled x402 payment.
@@ -313,7 +662,7 @@ Harden VerificationReceipt so every request produces a correct, cryptographicall
 
 ---
 
-## 7. Phase 9 — SQLite Persistence
+## 8. Phase 9 — SQLite Persistence
 
 ### Objective
 Persist finalized verification records locally for audit trail and Merkle anchoring.
@@ -363,7 +712,7 @@ CREATE INDEX idx_lvr_created_at ON local_verification_records(created_at);
 
 ---
 
-## 8. Phase 10 — Merkle Anchoring
+## 9. Phase 10 — Merkle Anchoring
 
 ### Merkle Algorithm
 
@@ -398,7 +747,7 @@ CREATE INDEX idx_lvr_created_at ON local_verification_records(created_at);
 
 ---
 
-## 9. Phase 11 — Real E2E Demo
+## 10. Phase 11 — Real E2E Demo
 
 ### Two Demo Modes
 
@@ -440,7 +789,7 @@ The semantic repair provider (`MockSemanticProvider`) is an **intentional part o
 
 ---
 
-## 10. Phase 12 — Ed25519 Receipt Signing
+## 11. Phase 12 — Ed25519 Receipt Signing
 
 ### Why Signing Was Needed
 Third parties need to verify that a receipt was actually produced by Verified and hasn't been modified. Ed25519 provides fast, Algorand-compatible digital signatures.
@@ -478,7 +827,7 @@ The signing key is **separate** from:
 
 ---
 
-## 11. Phase 13 — Independent Verification
+## 12. Phase 13 — Independent Verification
 
 ### Three Verification Paths
 
@@ -534,7 +883,7 @@ GET /api/v1/receipt/public-key
 
 ---
 
-## 12. Phase 14 — Backend Hardening
+## 13. Phase 14 — Backend Hardening
 
 ### Issues Found and Fixed
 
@@ -553,7 +902,7 @@ GET /api/v1/receipt/public-key
 
 ---
 
-## 13. Complete API Reference
+## 14. Complete API Reference
 
 ### GET /health
 
@@ -662,7 +1011,7 @@ Get the public verification key.
 
 ---
 
-## 14. Complete Data Model
+## 15. Complete Data Model
 
 ### Entity Relationships
 
@@ -691,7 +1040,7 @@ LocalVerificationRecord (SQLite) = Result + Receipt + AnchoringStatus
 
 ---
 
-## 15. Payment Configuration
+## 16. Payment Configuration
 
 | Setting | Value | Notes |
 |---------|-------|-------|
@@ -706,7 +1055,7 @@ LocalVerificationRecord (SQLite) = Result + Receipt + AnchoringStatus
 
 ---
 
-## 16. Environment Configuration
+## 17. Environment Configuration
 
 ### Public Configuration
 
@@ -737,7 +1086,7 @@ LocalVerificationRecord (SQLite) = Result + Receipt + AnchoringStatus
 
 ---
 
-## 17. Setup From Zero
+## 18. Setup From Zero
 
 ### Prerequisites
 - Python 3.11+
@@ -799,7 +1148,7 @@ for k in ['PAYER_PRIVATE_KEY','ANCHOR_PRIVATE_KEY','RECEIPT_SIGNING_PRIVATE_KEY'
 
 ---
 
-## 18. Wallet / Algorand Setup
+## 19. Wallet / Algorand Setup
 
 ### Three Separate Identities
 
@@ -848,7 +1197,7 @@ print(f'ALGO: {info[\"amount\"]/1e6}')
 
 ---
 
-## 19. How to Run the Backend
+## 20. How to Run the Backend
 
 ```powershell
 cd backend
@@ -871,7 +1220,7 @@ Verify: `curl http://localhost:8000/health` → `{"status":"ok","service":"verif
 
 ---
 
-## 20. How to Run the Test Suite
+## 21. How to Run the Test Suite
 
 ```powershell
 cd backend
@@ -909,7 +1258,7 @@ pytest tests/api/ -v         # API endpoint tests
 
 ---
 
-## 21. How to Run the Offline Demo
+## 22. How to Run the Offline Demo
 
 ```powershell
 cd backend
@@ -924,7 +1273,7 @@ python scripts/demo_e2e.py
 
 ---
 
-## 22. How to Run the Real Demo
+## 23. How to Run the Real Demo
 
 ```powershell
 cd backend
@@ -947,7 +1296,7 @@ python scripts/demo_e2e.py --real
 
 ---
 
-## 23. Complete Feature Demonstration Checklist
+## 24. Complete Feature Demonstration Checklist
 
 | # | Feature | Trigger | Verification |
 |---|---------|---------|-------------|
@@ -977,7 +1326,7 @@ python scripts/demo_e2e.py --real
 
 ---
 
-## 24. Complete Real E2E Walkthrough
+## 25. Complete Real E2E Walkthrough
 
 ### Step 1: Start Backend
 ```powershell
@@ -1069,7 +1418,7 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 25. Troubleshooting History
+## 26. Troubleshooting History
 
 ### Problem: HTTP 500 instead of HTTP 402
 - **Root cause**: x402 middleware initialization at module load time
@@ -1117,7 +1466,7 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 26. Security Model
+## 27. Security Model
 
 ### Secret Separation
 
@@ -1153,7 +1502,7 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 27. What is Real vs. Mocked
+## 28. What is Real vs. Mocked
 
 | Component | Real in Demo | Mocked In | Why Mocked |
 |-----------|-------------|-----------|------------|
@@ -1172,13 +1521,13 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 28. Testing Matrix
+## 29. Testing Matrix
 
 ### Phase-Specific Test Counts
 
 | Phase | New Tests | Focus |
 |-------|-----------|-------|
-| 8 | 25 | Receipt signing, verification, tamper detection |
+| 8 | 28 | Payment metadata, receipt integrity, tamper detection |
 | 9 | 30 | SQLite persistence, idempotency, anchoring status |
 | 10 | 39 | Merkle tree, anchoring service, proof generation |
 | 11 | 5 | Failure path tests |
@@ -1194,7 +1543,7 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 29. Real TestNet Evidence
+## 30. Real TestNet Evidence
 
 ### Run: August 21, 2026 (Phase 14 final validation)
 
@@ -1214,7 +1563,7 @@ result = ReceiptVerifier(pub).verify(tampered)
 
 ---
 
-## 30. Frontend Handoff
+## 31. Frontend Handoff
 
 ### The backend is complete through Phase 14.
 
@@ -1254,7 +1603,7 @@ These remain server-controlled:
 
 ---
 
-## 31. Current Backend Status
+## 32. Current Backend Status
 
 ```
 Backend:              COMPLETE THROUGH PHASE 14
