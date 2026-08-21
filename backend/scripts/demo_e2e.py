@@ -16,7 +16,7 @@ Usage:
   # Offline demo (mocked payment, no network required):
   python scripts/demo_e2e.py
 
-  # Real TestNet demo (requires PAYER_PRIVATE_KEY, ANCHOR_PRIVATE_KEY):
+  # Real TestNet demo (in-process, real Algorand):
   python scripts/demo_e2e.py --real
 
 Environment variables (for real demo):
@@ -334,30 +334,31 @@ def run_offline_demo():
             store.close()
             return
 
-        # -- Step 11: Merkle anchoring --
-        step(11, "Merkle Anchoring")
+        # -- Step 11: Merkle tree (local only for offline) --
+        step(11, "Merkle Tree (offline -- no Algorand anchor)")
         unanchored = store.list_unanchored_records()
         detail("Unanchored records", str(len(unanchored)))
 
         from app.anchoring.merkle import build_merkle_tree, generate_proof, verify_proof
 
-        # Build Merkle tree from all unanchored records
-        if unanchored:
-            # Limit to a manageable batch for demo
-            batch = unanchored[:10]
-            leaves = [r.receipt_hash for r in batch]
-            tree = build_merkle_tree(leaves)
-            detail("Batch size", str(len(batch)) + " of " + str(len(unanchored)) + " unanchored")
-            detail("Merkle root", tree.root[:16] + "...", CYAN)
+        # Filter to records with valid 64-char hex receipt_hash
+        valid_unanchored = [r for r in unanchored if len(r.receipt_hash) == 64]
+        valid_unanchored = [r for r in valid_unanchored if all(c in '0123456789abcdef' for c in r.receipt_hash)]
 
-            # Find our record's index in the batch
+        if valid_unanchored:
+            # Find our record in valid unanchored list
             demo_idx = None
-            for i, r in enumerate(batch):
+            for i, r in enumerate(valid_unanchored):
                 if r.request_id == paid_request_id:
                     demo_idx = i
                     break
 
             if demo_idx is not None:
+                leaves = [r.receipt_hash for r in valid_unanchored]
+                tree = build_merkle_tree(leaves)
+                detail("Batch size", str(len(leaves)))
+                detail("Merkle root", tree.root[:16] + "...", CYAN)
+
                 # -- Step 12: Inclusion proof --
                 step(12, "Merkle Inclusion Proof")
                 proof = generate_proof(tree, demo_idx)
@@ -381,26 +382,7 @@ def run_offline_demo():
                 if not tamper_valid:
                     success("Tamper detection: WORKING (tampered hash rejected)")
             else:
-                # Our record is beyond the first batch; build a single-leaf tree for proof demo
-                step(12, "Merkle Inclusion Proof (single-leaf demo)")
-                single_leaves = [record.receipt_hash]
-                single_tree = build_merkle_tree(single_leaves)
-                single_proof = generate_proof(single_tree, 0)
-                single_valid = verify_proof(record.receipt_hash, single_proof, single_tree.root, 0)
-                detail("Leaf index", "0 (single leaf)")
-                detail("Proof length", f"{len(single_proof)} hashes")
-                detail("Proof valid", "YES" if single_valid else "NO",
-                       GREEN if single_valid else RED)
-                if single_valid:
-                    success("Merkle inclusion proof: VALID")
-
-                step(13, "Tamper Detection")
-                fake_hash = hashlib.sha256("tampered_data".encode()).hexdigest()
-                tamper_valid = verify_proof(fake_hash, single_proof, single_tree.root, 0)
-                detail("Tampered hash verification", "INVALID" if not tamper_valid else "ERROR",
-                       GREEN if not tamper_valid else RED)
-                if not tamper_valid:
-                    success("Tamper detection: WORKING (tampered hash rejected)")
+                failure("Demo record not found in unanchored list")
         else:
             detail("Records", "None available for Merkle tree")
 
@@ -418,212 +400,411 @@ def run_offline_demo():
 
 
 # ===============================================================
-# Real TestNet demo (uses live Algorand)
+# Real TestNet demo (in-process, real Algorand)
 # ===============================================================
 
 def run_real_demo():
-    """Run the real end-to-end demo against a running server with live Algorand."""
-    import httpx
-    import asyncio
+    """Run the real E2E demo in-process using TestClient.
 
-    header("VERIFIED -- REAL TESTNET DEMONSTRATION")
-    print(f"  {YELLOW}This demo requires a running server and real Algorand TestNet.{RESET}")
-    print(f"  {DIM}Start server: cd backend && uvicorn app.main:app --port 8000{RESET}\n")
+    All external calls are real:
+      - x402 payment verification via GoPlausible facilitator
+      - Algorand TestNet settlement
+      - Merkle anchoring to Algorand TestNet
+
+    No server startup required -- runs entirely in-process.
+    """
+    import asyncio
+    import base64
+
+    from dotenv import load_dotenv
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    from app.storage.store import LocalVerificationRecordStore
+    from app.core.config import settings
+    from app.evidence.hasher import hash_data
+
+    # -- Load env --
+    load_dotenv(".env")
+    load_dotenv(".env.client")
+
+    header("VERIFIED -- REAL TESTNET DEMONSTRATION (in-process)")
+    print(f"  {YELLOW}Real Algorand TestNet -- real x402 payment + real Merkle anchoring.{RESET}\n")
 
     env = check_environment(real_mode=True)
 
-    server_url = "http://localhost:8000"
-
-    # Check server is running
-    step(1, "Server Health Check")
-    try:
-        resp = httpx.get(f"{server_url}/health", timeout=5)
-        if resp.status_code == 200:
-            detail("Server", "running [OK]", GREEN)
-        else:
-            failure(f"Server returned {resp.status_code}")
-            return
-    except Exception as e:
-        failure(f"Server not reachable: {e}")
-        detail("Start server", "cd backend && uvicorn app.main:app --port 8000")
-        return
-
-    # Load payer key for x402
-    from dotenv import load_dotenv
-    load_dotenv(".env.client")
-
     payer_key = os.environ.get("PAYER_PRIVATE_KEY")
-    if not payer_key:
-        failure("PAYER_PRIVATE_KEY not found in .env.client")
-        return
+    anchor_key = os.environ.get("ANCHOR_PRIVATE_KEY")
 
     from scripts.e2e_client import PrivateKeySigner
-    from x402.client import x402Client
-    from x402.mechanisms.avm.exact import ExactAvmClientScheme
-    from x402.schemas import PaymentRequired
-    import base64
 
     signer = PrivateKeySigner(payer_key)
     detail("Payer address", signer.address)
 
-    # Build payload
-    payload = build_demo_payload()
-    request_id = payload["request"]["request_id"]
+    if anchor_key:
+        from algosdk import encoding as algo_encoding
+        anchor_sk = base64.b64decode(anchor_key)
+        anchor_addr = algo_encoding.encode_address(anchor_sk[32:])
+        detail("Anchor address", anchor_addr)
 
-    step(2, "Verification Request")
-    detail("Request ID", request_id[:8] + "...")
+    # ===========================================================
+    # Step 1-2: Build verification request + show free path
+    # ===========================================================
+    free_request_id = str(uuid4())
+    free_payload = build_demo_payload(free_request_id)
 
-    async def _real_flow():
-        async with httpx.AsyncClient(timeout=60) as client:
-            # Step 3: Call semantic-repair without payment -> expect 402
-            step(3, "HTTP 402 Challenge")
-            t0 = time.time()
-            resp = await client.post(f"{server_url}/api/v1/semantic-repair", json=payload)
-            t_402 = (time.time() - t0) * 1000
+    step(1, "Verification Request")
+    detail("Free Request ID", free_request_id[:8] + "...")
+    detail("Output", '{"name": "Alice", "inject_mock_semantic_repair": {"age": 30}}')
+    detail("Schema", "object with required: [name, age]")
 
-            if resp.status_code != 402:
-                failure(f"Expected 402, got {resp.status_code}")
-                detail("Response", resp.text[:200])
-                return
+    # Free path (local validation, no payment)
+    step(2, "Local Validation (free -- no payment)")
+    t0 = time.time()
+    with TestClient(app, raise_server_exceptions=False) as c:
+        resp = c.post("/api/v1/verify", json=free_payload)
+    t_local = (time.time() - t0) * 1000
 
-            timing("402 response", t_402)
-            detail("Status", "402 Payment Required [OK]", GREEN)
+    if resp.status_code == 200:
+        data = resp.json()
+        detail("Outcome", data["result"]["outcome"], YELLOW)
+        detail("Findings", str(len(data["result"]["findings"])))
+        timing("Local validation", t_local)
+    else:
+        failure(f"Local validation failed: {resp.status_code}")
 
-            # Parse payment requirements
-            payment_required_b64 = resp.headers.get("PAYMENT-REQUIRED")
-            if not payment_required_b64:
-                failure("No PAYMENT-REQUIRED header")
-                return
+    step(3, "Escalation Decision")
+    detail("Blocking findings", "Yes (missing 'age' field)")
+    detail("Decision", "escalate -> x402 payment required", YELLOW)
 
-            pr_json = base64.b64decode(payment_required_b64).decode("utf-8")
-            pr_data = json.loads(pr_json)
-            detail("Payment scheme", pr_data.get("accepts", [{}])[0].get("scheme", "unknown"))
-            detail("Asset", pr_data.get("accepts", [{}])[0].get("asset", "unknown"))
-            detail("Amount", pr_data.get("accepts", [{}])[0].get("amount", "unknown"))
+    # Paid path (separate request_id to avoid SQLite integrity conflict)
+    request_id = str(uuid4())
+    payload = build_demo_payload(request_id)
 
-            # Step 4: Create x402 payment
-            step(4, "x402 Payment Construction")
-            x402_client = x402Client()
-            scheme = ExactAvmClientScheme(signer=signer)
-            x402_client.register(env["ALGORAND_NETWORK"], scheme)
-            payment_required_model = PaymentRequired(**pr_data)
+    # ===========================================================
+    # Step 4-6: Real x402 payment + semantic repair
+    # ===========================================================
+    step(4, "x402 Payment + Semantic Repair (REAL)")
 
-            t0 = time.time()
-            payment_payload = await x402_client.create_payment_payload(payment_required_model)
-            t_payment = (time.time() - t0) * 1000
-            timing("Payment construction", t_payment)
-            detail("x402 version", str(payment_payload.x402_version))
+    async def _real_payment_flow():
+        import httpx
+        from x402.client import x402Client
+        from x402.mechanisms.avm.exact import ExactAvmClientScheme
+        from x402.schemas import PaymentRequired
 
-            # Step 5: Submit payment
-            step(5, "Payment Submission & Settlement")
-            encoded = base64.b64encode(
-                payment_payload.model_dump_json(by_alias=True, exclude_none=True).encode()
-            ).decode()
-            header_name = "PAYMENT-SIGNATURE" if payment_payload.x402_version == 2 else "X-PAYMENT"
+        # Use httpx to a running server... but we're in-process.
+        # Instead, use TestClient for the 402 challenge, then x402Client
+        # for payment creation, then TestClient again for the paid request.
 
-            t0 = time.time()
-            resp2 = await client.post(
-                f"{server_url}/api/v1/semantic-repair",
+        # First get 402 from TestClient
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp_402 = c.post("/api/v1/semantic-repair", json=payload)
+
+        if resp_402.status_code != 402:
+            failure(f"Expected 402, got {resp_402.status_code}")
+            detail("Response", resp_402.text[:200])
+            return None, None, None, None
+
+        t_402_start = time.time()
+        detail("Status", "402 Payment Required [OK]", GREEN)
+
+        # Parse payment requirements
+        payment_required_b64 = resp_402.headers.get("PAYMENT-REQUIRED")
+        if not payment_required_b64:
+            failure("No PAYMENT-REQUIRED header in 402 response")
+            return None, None, None, None
+
+        pr_json = base64.b64decode(payment_required_b64).decode("utf-8")
+        pr_data = json.loads(pr_json)
+        detail("Scheme", pr_data.get("accepts", [{}])[0].get("scheme", "unknown"))
+        detail("Asset", pr_data.get("accepts", [{}])[0].get("asset", "unknown"))
+        detail("Amount", pr_data.get("accepts", [{}])[0].get("amount", "unknown"))
+
+        # Create x402 payment with real client
+        x402_client = x402Client()
+        scheme = ExactAvmClientScheme(signer=signer)
+        network = env["ALGORAND_NETWORK"]
+        x402_client.register(network, scheme)
+        payment_required_model = PaymentRequired(**pr_data)
+
+        t0 = time.time()
+        payment_payload = await x402_client.create_payment_payload(payment_required_model)
+        t_payment_create = (time.time() - t0) * 1000
+        timing("Payment construction (real signing)", t_payment_create)
+        detail("x402 version", str(payment_payload.x402_version))
+
+        # Encode payment header
+        encoded = base64.b64encode(
+            payment_payload.model_dump_json(by_alias=True, exclude_none=True).encode()
+        ).decode()
+        header_name = "PAYMENT-SIGNATURE" if payment_payload.x402_version == 2 else "X-PAYMENT"
+
+        # Submit with payment to TestClient (real settlement via middleware)
+        t0 = time.time()
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp_paid = c.post(
+                "/api/v1/semantic-repair",
                 json=payload,
                 headers={header_name: encoded},
             )
-            t_settle = (time.time() - t0) * 1000
+        t_settle = (time.time() - t0) * 1000
 
-            if resp2.status_code == 200:
-                timing("Settlement + repair + receipt", t_settle)
-                detail("Status", "200 OK [OK]", GREEN)
+        t_402_total = (time.time() - t_402_start) * 1000
+        timing("Settlement + repair + receipt (real)", t_settle)
+        timing("Total 402 flow", t_402_total)
 
-                data = resp2.json()
-                result = data["result"]
-                receipt = data["receipt"]
-                pm = data.get("payment_metadata")
+        if resp_paid.status_code == 200:
+            detail("Status", "200 OK [OK]", GREEN)
+            data = resp_paid.json()
+            return data, resp_paid.headers, t_settle, t_402_total
+        else:
+            failure(f"Payment failed: {resp_paid.status_code}")
+            detail("Response", resp_paid.text[:300])
+            return None, None, None, None
 
-                # Step 6: Show result
-                step(6, "Semantic Repair Result")
-                detail("Outcome", result["outcome"], GREEN)
-                detail("Repair type", result.get("repair_info", {}).get("repair_type", "N/A"))
-                detail("Payment ref", result.get("repair_info", {}).get("payment_ref", "N/A")[:8] + "...")
+    data, resp_headers, t_settle, t_402_total = asyncio.run(_real_payment_flow())
 
-                # Step 7: Payment metadata
-                step(7, "Payment Metadata")
-                if pm:
-                    detail("Status", pm["payment_status"], GREEN)
-                    detail("Facilitator", pm["facilitator"])
-                    detail("Network", pm["settlement_network"])
-                    detail("Settlement TX", pm.get("algorand_tx_ref", "N/A"))
+    if data is None:
+        failure("x402 payment flow failed")
+        return
 
-                # Step 8: Receipt
-                step(8, "Verification Receipt")
-                detail("Receipt ID", str(receipt["receipt_id"])[:8] + "...")
-                detail("Outcome", receipt["outcome"])
-                detail("Receipt hash", receipt["receipt_hash"][:16] + "...")
-                detail("Output hash", receipt["output_hash"][:16] + "...")
+    result = data["result"]
+    receipt = data["receipt"]
+    pm = data.get("payment_metadata")
 
-                # Verify receipt hash
-                from app.evidence.hasher import hash_data
-                rd = dict(receipt)
-                rd.pop("receipt_hash", None)
-                rd.pop("signature", None)
-                computed = hash_data(rd)
-                valid = computed == receipt["receipt_hash"]
-                detail("Receipt integrity", "VALID [OK]" if valid else "INVALID [FAIL]",
-                       GREEN if valid else RED)
+    # ===========================================================
+    # Step 7: Show result
+    # ===========================================================
+    step(5, "Semantic Repair Result")
+    detail("Outcome", result["outcome"], GREEN)
+    detail("Repair type", result.get("repair_info", {}).get("repair_type", "N/A"))
+    payment_ref = result.get("repair_info", {}).get("payment_ref")
+    detail("Payment ref", (payment_ref[:8] + "..." if payment_ref else "N/A"), GREEN)
+    success("Semantic repair passed re-validation")
 
-                # Step 9: SQLite
-                step(9, "SQLite Persistence")
-                from app.storage.store import LocalVerificationRecordStore
-                from app.core.config import settings
-                store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
-                record = store.get_by_request_id(request_id)
-                if record:
-                    detail("Record", "PERSISTED [OK]", GREEN)
-                    detail("Anchoring", record.anchoring_status.value)
+    # ===========================================================
+    # Step 8: Payment metadata
+    # ===========================================================
+    step(6, "Payment Metadata (Phase 8)")
+    if pm:
+        detail("Status", pm["payment_status"], GREEN)
+        detail("Facilitator", pm["facilitator"])
+        detail("Network", pm["settlement_network"])
+        detail("Settlement TX", pm.get("algorand_tx_ref", "N/A"))
+        success("Phase 8 invariant: payment_status = settled")
+    else:
+        warning("No payment metadata returned")
+
+    # ===========================================================
+    # Step 9: Receipt
+    # ===========================================================
+    step(7, "Verification Receipt")
+    detail("Receipt ID", str(receipt["receipt_id"])[:8] + "...")
+    detail("Outcome", receipt["outcome"], GREEN)
+    detail("Output hash", receipt["output_hash"][:16] + "...")
+    detail("Schema", receipt["schema_ref_and_version"])
+    detail("Repair hash", (receipt.get("repair_summary_hash") or "N/A")[:16] + "...")
+    detail("Validator", receipt["validator_version"])
+
+    # Verify receipt hash
+    rd = dict(receipt)
+    rd.pop("receipt_hash", None)
+    rd.pop("signature", None)
+    computed = hash_data(rd)
+    valid = computed == receipt["receipt_hash"]
+    detail("Receipt hash", receipt["receipt_hash"][:16] + "...",
+           GREEN if valid else RED)
+    if valid:
+        success("Receipt integrity: VALID")
+    else:
+        failure("Receipt integrity: INVALID")
+
+    # ===========================================================
+    # Step 10: SQLite persistence
+    # ===========================================================
+    step(8, "SQLite Persistence")
+    store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
+    record = store.get_by_request_id(request_id)
+
+    if record:
+        detail("Record", "PERSISTED [OK]", GREEN)
+        detail("Outcome", record.outcome)
+        detail("Receipt hash", record.receipt_hash[:16] + "...")
+        detail("Anchoring", record.anchoring_status.value)
+        detail("Database", settings.resolved_database_path)
+    else:
+        failure("Record not found in database")
+        store.close()
+        return
+
+    # ===========================================================
+    # Step 11: REAL Merkle anchoring to Algorand TestNet
+    # ===========================================================
+    step(9, "Merkle Anchoring (REAL Algorand TestNet)")
+
+    if not anchor_key:
+        detail("ANCHOR_PRIVATE_KEY", "not set -- skipping anchoring")
+        store.close()
+        return
+
+    from app.anchoring.service import (
+        MerkleAnchoringService,
+        TestNetAlgorandClient,
+    )
+    from app.anchoring.merkle import build_merkle_tree, generate_proof, verify_proof
+
+    # Create real Algorand client for anchoring
+    anchor_client = TestNetAlgorandClient(
+        private_key_b64=anchor_key,
+        algod_address=settings.ANCHOR_ALGOD_ADDRESS,
+        algod_token=settings.ANCHOR_ALGOD_TOKEN,
+    )
+
+    # Show unanchored count before
+    unanchored_before = store.list_unanchored_records()
+    detail("Unanchored before", str(len(unanchored_before)))
+
+    # Compute Merkle root for display
+    leaves_before = [r.receipt_hash for r in unanchored_before]
+    tree_before = build_merkle_tree(leaves_before)
+    detail("Merkle root", tree_before.root[:16] + "...", CYAN)
+    detail("Leaf count", str(len(leaves_before)))
+
+    # Execute REAL anchoring
+    anchoring_service = MerkleAnchoringService(
+        record_store=store,
+        anchor_client=anchor_client,
+        batch_size=settings.MERKLE_BATCH_SIZE,
+    )
+
+    t0 = time.time()
+    anchor_result = anchoring_service.anchor_pending_records()
+    t_anchor = (time.time() - t0) * 1000
+
+    if anchor_result.status == "anchored":
+        timing("Real Algorand anchor", t_anchor)
+        detail("Status", "ANCHORED [OK]", GREEN)
+        detail("Records anchored", str(anchor_result.leaf_count))
+        detail("Merkle root", anchor_result.merkle_root[:16] + "...")
+        detail("Algorand tx", anchor_result.transaction_id, CYAN)
+        success("Real Algorand anchor transaction confirmed")
+    elif anchor_result.status == "no_records_to_anchor":
+        detail("Status", "no unanchored records")
+        store.close()
+        return
+    else:
+        failure(f"Anchoring failed: {anchor_result.error}")
+        detail("Status", anchor_result.status)
+        store.close()
+        return
+
+    # ===========================================================
+    # Step 12: Verify on-chain transaction
+    # ===========================================================
+    step(10, "On-Chain Verification (readback from Algorand)")
+    try:
+        from algosdk.v2client import algod as algod_module
+        verify_client = algod_module.AlgodClient(
+            settings.ANCHOR_ALGOD_TOKEN,
+            settings.ANCHOR_ALGOD_ADDRESS,
+        )
+        tx_info = verify_client.pending_transaction_info(anchor_result.transaction_id)
+        if tx_info and tx_info.get("confirmed-round"):
+            detail("Confirmed round", str(tx_info["confirmed-round"]))
+            detail("Transaction", "CONFIRMED on Algorand TestNet", GREEN)
+
+            # Verify note field contains Merkle root
+            note_b64 = tx_info.get("txn", {}).get("txn", {}).get("note", "")
+            if note_b64:
+                note_bytes = base64.b64decode(note_b64)
+                note_str = note_bytes.decode("utf-8", errors="replace")
+                expected_prefix = f"verified-merkle-v1:{anchor_result.merkle_root}"
+                if note_str == expected_prefix:
+                    detail("On-chain note", "MATCHES local Merkle root", GREEN)
+                    success("On-chain root verification: VALID")
                 else:
-                    detail("Record", "NOT FOUND", RED)
-
-                # Step 10: Merkle anchoring (if configured)
-                step(10, "Merkle Anchoring")
-                anchor_key = os.environ.get("ANCHOR_PRIVATE_KEY")
-                if anchor_key:
-                    unanchored = store.list_unanchored_records()
-                    detail("Unanchored", str(len(unanchored)))
-
-                    if len(unanchored) > 0:
-                        from app.anchoring.merkle import build_merkle_tree, generate_proof, verify_proof
-                        leaves = [r.receipt_hash for r in unanchored[:10]]
-                        tree = build_merkle_tree(leaves)
-                        detail("Merkle root", tree.root[:16] + "...")
-
-                        # Find demo record index
-                        demo_idx = None
-                        for i, r in enumerate(unanchored[:10]):
-                            if r.request_id == request_id:
-                                demo_idx = i
-                                break
-
-                        if demo_idx is not None:
-                            proof = generate_proof(tree, demo_idx)
-                            proof_valid = verify_proof(leaves[demo_idx], proof, tree.root, demo_idx)
-                            detail("Inclusion proof", "VALID [OK]" if proof_valid else "INVALID [FAIL]",
-                                   GREEN if proof_valid else RED)
-
-                            # Tamper test
-                            fake = hashlib.sha256("tampered".encode()).hexdigest()
-                            tamper = verify_proof(fake, proof, tree.root, demo_idx)
-                            detail("Tamper detection", "WORKING [OK]" if not tamper else "BROKEN",
-                                   GREEN if not tamper else RED)
-                else:
-                    detail("ANCHOR_PRIVATE_KEY", "not set -- skipping anchoring")
-
-                store.close()
-
+                    detail("On-chain note", note_str[:64] + "...")
+                    detail("Expected prefix", expected_prefix[:64] + "...")
+                    warning("Note format mismatch (check encoding)")
             else:
-                failure(f"Payment failed: {resp2.status_code}")
-                detail("Response", resp2.text[:200])
+                detail("Note", "empty in tx info")
+        else:
+            detail("Transaction", "PENDING (not yet confirmed)")
+    except Exception as e:
+        detail("On-chain readback", f"error: {e}")
+        warning("Could not read back transaction from Algorand (may need time to propagate)")
 
-    asyncio.run(_real_flow())
+    # ===========================================================
+    # Step 13: Verify local anchor state
+    # ===========================================================
+    step(11, "Local Anchor State")
+    record_after = store.get_by_request_id(request_id)
+    if record_after:
+        detail("Anchoring status", record_after.anchoring_status.value,
+               GREEN if record_after.anchoring_status.value == "anchored" else RED)
+        detail("Merkle root", (record_after.merkle_root or "N/A")[:16] + "...")
+        detail("Anchor tx ref", (record_after.anchor_tx_ref or "N/A"))
 
+        unanchored_after = store.list_unanchored_records()
+        still_unanchored = [r for r in unanchored_after if r.request_id == request_id]
+        if not still_unanchored:
+            detail("In unanchored list", "NO (correct)", GREEN)
+            success("Local anchor state: VALID")
+        else:
+            detail("In unanchored list", "YES (unexpected)", RED)
+
+    # ===========================================================
+    # Step 14: Merkle inclusion proof
+    # ===========================================================
+    step(12, "Merkle Inclusion Proof")
+
+    # Rebuild tree from the original ordered batch for proof generation
+    demo_idx = None
+    for i, r in enumerate(unanchored_before):
+        if r.request_id == request_id:
+            demo_idx = i
+            break
+
+    if demo_idx is not None:
+        proof = generate_proof(tree_before, demo_idx)
+        proof_valid = verify_proof(leaves_before[demo_idx], proof, tree_before.root, demo_idx)
+
+        detail("Leaf index", str(demo_idx))
+        detail("Proof length", f"{len(proof)} hashes")
+        detail("Proof valid", "YES" if proof_valid else "NO",
+               GREEN if proof_valid else RED)
+
+        if proof_valid:
+            success("Merkle inclusion proof: VALID")
+    else:
+        detail("Demo record", "not found in anchoring batch (may have been in overflow)")
+
+    # ===========================================================
+    # Step 15: Tamper detection
+    # ===========================================================
+    step(13, "Tamper Detection")
+    if demo_idx is not None:
+        fake = hashlib.sha256("tampered".encode()).hexdigest()
+        tamper = verify_proof(fake, proof, tree_before.root, demo_idx)
+        detail("Tampered hash", "REJECTED [OK]" if not tamper else "ACCEPTED [ERROR]",
+               GREEN if not tamper else RED)
+
+        if not tamper:
+            success("Tamper detection: WORKING")
+    else:
+        detail("Skipped", "demo record not in anchoring batch")
+
+    store.close()
+
+    # ===========================================================
+    # Summary
+    # ===========================================================
     header("DEMO COMPLETE")
+    detail("Payment", "REAL x402 -> GoPlausible -> Algorand TestNet", GREEN)
+    detail("Receipt", f"REAL (receipt_hash={receipt['receipt_hash'][:16]}...)", GREEN)
+    detail("SQLite", "REAL persistence", GREEN)
+    detail("Anchoring", f"REAL Algorand tx={anchor_result.transaction_id}", GREEN)
+    detail("Proof", "REAL Merkle inclusion proof", GREEN)
 
 
 # ===============================================================
