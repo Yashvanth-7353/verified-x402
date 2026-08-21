@@ -47,8 +47,9 @@ No network, no keys, no money required:
 
 ```bash
 cd backend
-python -m pytest tests/ -q    # Run all 166 tests
-python scripts/demo_e2e.py    # Run offline demo
+python -m pytest tests/ -q    # Run all 171 tests
+python scripts/demo_e2e.py    # Run offline demo (mocked, no network)
+python scripts/demo_e2e.py --real  # Run real TestNet demo (in-process)
 ```
 
 ## 5. Environment Variables
@@ -112,14 +113,22 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 python scripts/demo_e2e.py
 ```
 
-### Real TestNet (requires running server + funded wallet):
+### Real TestNet (in-process — no server needed):
 ```bash
-# Terminal 1: Start server
-uvicorn app.main:app --port 8000
+# Set environment variables
+export PAYER_PRIVATE_KEY=<base64-key>
+export ANCHOR_PRIVATE_KEY=<base64-key>
 
-# Terminal 2: Run demo
+# Run the real demo (in-process TestClient + real Algorand)
 python scripts/demo_e2e.py --real
 ```
+
+The real demo runs entirely in-process using FastAPI's TestClient.
+All external calls are real:
+- x402 payment verification via GoPlausible facilitator
+- Algorand TestNet settlement
+- Merkle anchoring to Algorand TestNet
+- On-chain transaction readback verification
 
 ## 11. API Endpoints
 
