@@ -162,7 +162,21 @@ Depends on: Milestone 10 (receipt signing).
 - [x] JSON roundtrip verification.
 - [x] CLI exits 0 for valid, 1 for invalid.
 
-## 14. Optional / Future Scope Tasks (Explicitly Not MVP)
+## 14. Milestone 12 — Backend Hardening & Production Readiness ✅ Phase 14 complete
+
+Depends on: All previous milestones.
+
+- [x] CORS middleware with configurable origins (CORS_ORIGINS env var).
+- [x] Request payload size limits (MAX_REQUEST_BYTES).
+- [x] Batch size validation (1-1000) with safety clamp.
+- [x] Removed payment_failure.log disk writes (logging only).
+- [x] _build_payment_metadata: clean None-value filtering.
+- [x] Health endpoint returns version info.
+- [x] API contract documented (docs/API.md) for frontend integration.
+- [x] Full test suite: 234 passed, 0 failed.
+- [x] Real E2E: x402 payment → semantic repair → receipt → SQLite → Merkle → Algorand anchor.
+
+## 15. Optional / Future Scope Tasks (Explicitly Not MVP)
 
 - [ ] Multi-agent/multi-tenant policy isolation (PRD.md §11).
 - [ ] Semantic-repair provider marketplace / multiple providers (PRD.md §11).

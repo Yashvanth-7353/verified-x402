@@ -30,6 +30,8 @@ from x402.schemas import FacilitatorConfig as FacilitatorConfigSchema, AssetAmou
 from x402.server import x402ResourceServer
 from x402.mechanisms.avm.exact import register_exact_avm_server
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
 from app.core.errors import VerificationError, verification_error_handler
 from app.api.router import api_router
@@ -38,8 +40,26 @@ from app.core.logging import logger, setup_logging
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
-app = FastAPI()
+app = FastAPI(
+    title="Verified",
+    description="Local-first verification layer for AI agent structured output",
+    version="0.1.0",
+)
 setup_logging()
+
+# ---------------------------------------------------------------------------
+# CORS configuration (Phase 14: frontend readiness)
+# ---------------------------------------------------------------------------
+_origins_raw = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+_allowed_origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+logger.info("CORS allowed origins: %s", _allowed_origins)
 
 # ---------------------------------------------------------------------------
 # x402 resource server setup
@@ -56,17 +76,9 @@ def _verify_failure_hook(context: Any) -> Any:
     try:
         error = getattr(context, "error", None)
         error_msg = str(error) if error is not None else "unknown"
-        logger.error(f"x402 verification failure: error={error_msg}")
-        try:
-            log_path = os.path.join(os.path.dirname(__file__), "..", "payment_failure.log")
-            log_path = os.path.abspath(log_path)
-            with open(log_path, "a", encoding="utf-8") as f:
-                json.dump({"hook": "verify", "error": error_msg}, f)
-                f.write("\n")
-        except Exception as log_exc:
-            logger.exception(f"Failed to write verification failure log: {log_exc}")
+        logger.warning("x402 verification failure: error=%s", error_msg)
     except Exception as e:
-        logger.exception(f"Error in verification failure hook: {e}")
+        logger.exception("Error in verification failure hook: %s", e)
     return context
 
 

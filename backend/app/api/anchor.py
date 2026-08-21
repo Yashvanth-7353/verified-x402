@@ -38,6 +38,10 @@ class AnchorRequest(BaseModel):
     """Optional request body to override batch size."""
     batch_size: Optional[int] = None
 
+    def model_post_init(self, __context) -> None:
+        if self.batch_size is not None and (self.batch_size < 1 or self.batch_size > 1000):
+            raise ValueError("batch_size must be between 1 and 1000")
+
 
 class AnchorResponse(BaseModel):
     """Response from the anchoring operation."""
@@ -79,7 +83,12 @@ def anchor_records(payload: AnchorRequest = None) -> AnchorResponse:
             algod_token=settings.ANCHOR_ALGOD_TOKEN,
         )
 
-        batch_size = payload.batch_size if payload and payload.batch_size else settings.MERKLE_BATCH_SIZE
+        batch_size = (
+            payload.batch_size
+            if payload and payload.batch_size
+            else settings.MERKLE_BATCH_SIZE
+        )
+        batch_size = max(1, min(batch_size, 1000))  # Safety clamp
 
         service = MerkleAnchoringService(
             record_store=store,

@@ -65,13 +65,15 @@ def _build_payment_metadata(
     Called ONLY after the middleware has confirmed settlement succeeded.
     This guarantees payment_status = settled and a real Algorand tx ref.
     """
-    # Extract amount_and_asset from the payment requirements
+    # Extract amount_and_asset from the payment requirements (x402 PaymentRequirements model)
     amount_and_asset = {
         "scheme": getattr(payment_requirements, "scheme", None),
         "asset": getattr(payment_requirements, "asset", None),
         "amount": getattr(payment_requirements, "amount", None),
         "pay_to": getattr(payment_requirements, "pay_to", None),
     }
+    # Filter out None values for clean JSON serialization
+    amount_and_asset = {k: v for k, v in amount_and_asset.items() if v is not None}
 
     return PaymentMetadata(
         payment_id=uuid4(),
@@ -134,13 +136,10 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
         )
 
         logger.info(
-            "semantic_repair: request_id=%s payment_id=%s x402_challenge_ref=%s "
-            "payment_status=%s algorand_tx=%s",
+            "semantic_repair: request_id=%s payment_status=%s algorand_tx=%s",
             payload.request.request_id,
-            payment_metadata.payment_id,
-            payment_metadata.x402_challenge_ref,
-            payment_metadata.payment_status,
-            payment_metadata.algorand_tx_ref,
+            payment_metadata.payment_status.value,
+            payment_metadata.algorand_tx_ref or "N/A",
         )
 
         # 1. Validate the original payload

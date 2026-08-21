@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     RECEIPT_SIGNING_PRIVATE_KEY: str = ""  # Base64-encoded Ed25519 private key (32 bytes)
     RECEIPT_SIGNING_PUBLIC_KEY: str = ""   # Base64-encoded Ed25519 public key (for verification)
 
+    # Phase 14: CORS & Frontend Readiness
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"  # Comma-separated allowed origins
+    MAX_REQUEST_BYTES: int = 1_048_576  # 1 MB max request body
+
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
     @property
