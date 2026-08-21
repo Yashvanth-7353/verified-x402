@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import health, verify, semantic
+from app.api import health, verify, semantic, anchor
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -13,4 +13,9 @@ api_router.include_router(
     semantic.router,
     prefix=settings.API_V1_STR,
     tags=["semantic-repair"],
+)
+api_router.include_router(
+    anchor.router,
+    prefix=settings.API_V1_STR,
+    tags=["anchoring"],
 )

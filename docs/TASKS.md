@@ -95,16 +95,20 @@ Depends on: Milestone 5.
 - [x] Records survive process/database restart.
 - [x] 30 Phase 9 tests covering persistence, idempotency, anchoring, privacy, and restart.
 
-## 9. Milestone 7 — Merkle Anchoring on Algorand (MVP-critical)
+## 9. Milestone 7 — Merkle Anchoring on Algorand (MVP-critical) ✅ Phase 10 complete
 
 Depends on: Milestone 6.
 
-- [ ] Decide the anchoring trigger condition for the demo (time-based, count-based, or manual — ARCHITECTURE.md §11).
-- [ ] Implement Merkle tree construction over a batch of `receipt_hash` values.
-- [ ] Implement Algorand anchoring transaction submission carrying only the Merkle root.
-- [ ] Implement `MerkleInclusion` and `AnchorTransaction` record creation/linking back to `LocalVerificationRecord`.
-- [ ] Implement retry handling for anchoring failures (does not block receipt issuance — ARCHITECTURE.md §10).
-- [ ] End-to-end test: anchor a batch, then independently reconstruct a Merkle proof for a specific receipt and confirm it validates against the on-chain root.
+- [x] Anchoring trigger: explicit manual invocation via `POST /api/v1/anchor` (MVP choice).
+- [x] Deterministic binary Merkle tree over `receipt_hash` values (SHA-256, odd-node doubling).
+- [x] Algorand TestNet anchoring via payment transaction with Merkle root in note field.
+- [x] `mark_anchored()` updates `anchoring_status`, `merkle_root`, `anchor_tx_ref` on all batch records.
+- [x] Retry handling: failed batches remain unanchored, can be retried safely.
+- [x] Process-local lock prevents duplicate anchoring of same batch.
+- [x] Merkle inclusion proof generation and verification implemented.
+- [x] Configurable batch size via `MERKLE_BATCH_SIZE`.
+- [x] Anchoring wallet key via `ANCHOR_PRIVATE_KEY` env var (never hardcoded).
+- [x] 39 Phase 10 tests (18 Merkle + 21 service) covering tree, proofs, batching, failure, security.
 
 ## 10. Milestone 8 — Execution-Gating Demo Consumer (MVP-critical for demo credibility)
 

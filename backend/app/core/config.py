@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # Phase 9: Local Verification Record Store
     DATABASE_PATH: str = ""  # Empty = use default backend/data/verified.db
 
+    # Phase 10: Merkle Anchoring
+    ANCHOR_PRIVATE_KEY: str = ""  # Base64-encoded Algorand private key for anchoring
+    ANCHOR_ALGOD_ADDRESS: str = "https://testnet-api.algonode.cloud"  # Algorand TestNet node
+    ANCHOR_ALGOD_TOKEN: str = ""  # Algod API token (empty for public nodes)
+    MERKLE_BATCH_SIZE: int = 10  # Max records per anchor batch
+
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
     @property

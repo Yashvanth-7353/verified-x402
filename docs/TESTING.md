@@ -141,7 +141,42 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Simulate anchoring failure (network/Algorand unavailability) → confirm receipts already issued are unaffected, and confirm the record is retried/re-attempted rather than lost (ARCHITECTURE.md §10).
 - Confirm records not yet anchored are still correctly retrievable and their receipts remain valid/usable for execution gating even while `anchoring_status = unanchored` (DATA_MODEL.md §4 invariant).
 
-## 11. Privacy Test Scenarios
+### Phase 10 Merkle anchoring tests (implemented)
+
+**Merkle tree (18 tests):**
+- Empty tree returns None root.
+- Single leaf: root = leaf.
+- Two leaves: root = SHA256(A || B).
+- Three leaves: odd node doubled, root matches manual computation.
+- Four leaves: balanced tree.
+- Same inputs → same root (determinism).
+- Changed leaf → different root.
+- Changed order → different root.
+- Proof generation + verification for each leaf.
+- Proof fails with wrong root, wrong leaf, or wrong index.
+- Single leaf and odd-count tree proofs.
+
+**Anchoring service (21 tests):**
+- Empty batch → no_records_to_anchor, no Algorand call.
+- Batch selection: fewer/equal/more than batch size.
+- Only unanchored records selected.
+- Merkle root computed from batch.
+- Transaction ID stored from Algorand.
+- Merkle root sent to Algorand.
+- Submission failure → records remain unanchored.
+- Failed batch can be retried.
+- Successful batch not selected again.
+- No fake tx_ref on failure.
+- All records marked anchored after success.
+- Same merkle_root for entire batch.
+- Same anchor_tx_ref for entire batch.
+- Anchored records disappear from unanchored query.
+- Private key never in logs.
+- Raw payload never submitted.
+- X-PAYMENT never submitted.
+- Deterministic ordering → deterministic root.
+
+## 12. Privacy Test Scenarios
 
 - End-to-end trace of a full escalated request confirming that no unfiltered sensitive content appears in: the HTTP request sent to the semantic-repair API, any log output, the receipt, the local record's externally-shareable fields, or any Algorand transaction.
 - Negative test: a payload engineered to contain content matching a sensitive category is confirmed filtered even when it appears in a non-obvious location within the structured payload (e.g., nested field), to the extent the chosen filtering mechanism (Milestone 0 decision) claims to support.
