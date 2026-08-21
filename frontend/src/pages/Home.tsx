@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { health } from '../api/client';
 import { Guilloche, VerificationSeal } from '../components/VerificationSeal';
-import { Pill } from '../components/StatusBadge';
 import { Reveal } from '../components/Reveal';
 import { Typewriter } from '../components/Typewriter';
 import { useParallax } from '../lib/useReveal';
-import { useCountUp } from '../lib/useCountUp';
 import { useTilt } from '../lib/useTilt';
 import { loadSessionLog } from '../lib/session';
 import { relativeTime } from '../lib/format';
@@ -40,10 +37,6 @@ const FEATURES = [
   },
 ];
 
-const TICKER = [
-  'FAIL-CLOSED', 'ED25519-SIGNED', 'PAYMENT-GATED', 'MERKLE-ANCHORED',
-  'LOCAL-FIRST', 'RE-VALIDATED', 'TAMPER-EVIDENT', 'ALGORAND TESTNET',
-];
 
 function FeatureVisual({ kind }: { kind: string }) {
   const { nodeRef, onMouseMove, onMouseLeave } = useTilt<HTMLDivElement>(6);
@@ -102,40 +95,10 @@ function FeatureVisual({ kind }: { kind: string }) {
   );
 }
 
-function StatCard({ label, value, hint, tone }: { label: string; value: number; hint: string; tone?: 'success' }) {
-  const [ref, count] = useCountUp(value);
-  return (
-    <div ref={ref as never} className="card glass stat-card">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value poster-figure" style={{ fontSize: 32, color: tone === 'success' ? 'var(--success)' : undefined }}>
-        {count}
-      </span>
-      <span className="field-hint">{hint}</span>
-    </div>
-  );
-}
-
 export function Home() {
-  const [backendUp, setBackendUp] = useState<'checking' | 'up' | 'down'>('checking');
   const log = useMemo(() => loadSessionLog(), []);
   const [sealRef, sealOffset] = useParallax<HTMLDivElement>(0.06);
   const [guillocheRef, guillocheOffset] = useParallax<HTMLDivElement>(0.02);
-
-  useEffect(() => {
-    health()
-      .then(() => setBackendUp('up'))
-      .catch(() => setBackendUp('down'));
-  }, []);
-
-  const counts = useMemo(() => {
-    const c = { total: log.length, verified: 0, repaired: 0, rejected: 0 };
-    for (const e of log) {
-      if (e.outcome === 'verified') c.verified++;
-      else if (e.outcome === 'verified_repaired') c.repaired++;
-      else c.rejected++;
-    }
-    return c;
-  }, [log]);
 
   return (
     <div className="page-anim">
@@ -151,6 +114,21 @@ export function Home() {
       >
         <div ref={guillocheRef} className="parallax" style={{ position: 'absolute', inset: 0, transform: `translateY(${guillocheOffset}px)` }}>
           <Guilloche />
+        </div>
+        <div className="hero-particles">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="hero-particle"
+              style={{
+                width: 4 + (i % 4) * 2,
+                height: 4 + (i % 4) * 2,
+                top: `${10 + (i * 13) % 80}%`,
+                left: `${5 + (i * 17) % 90}%`,
+                animationDelay: `${-(i * 1.5)}s`,
+              }}
+            />
+          ))}
         </div>
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', position: 'relative' }}>
           <div style={{ maxWidth: 640 }}>
@@ -177,6 +155,13 @@ export function Home() {
               re-validates, and issues a signed, tamper-evident receipt — anchored to Algorand — before anything
               downstream is allowed to trust the result.
             </p>
+            <div style={{ marginTop: 12, minHeight: 24, fontSize: 'var(--fs-sm)', color: 'var(--text-faint)' }}>
+              <Typewriter
+                segments={[{ text: 'Cryptographically bound. Merkle anchored. Fails closed.' }]}
+                speed={20}
+                startDelay={2400}
+              />
+            </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 30, flexWrap: 'wrap' }}>
               <Link to="/verify" className="btn btn-accent">
                 Verify an output →
@@ -184,6 +169,20 @@ export function Home() {
               <Link to="/about" className="btn btn-ghost glass">
                 How it works
               </Link>
+            </div>
+            <div className="trust-badges">
+              <span className="trust-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Ed25519 Signed
+              </span>
+              <span className="trust-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                Algorand Anchored
+              </span>
+              <span className="trust-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                Fails Closed
+              </span>
             </div>
           </div>
           <div
@@ -194,63 +193,36 @@ export function Home() {
               borderRadius: '50%',
               padding: 28,
               transform: `translateY(${sealOffset}px)`,
+              position: 'relative',
             }}
           >
+            <div className="seal-glow" />
             <VerificationSeal outcome="verified" size={140} />
           </div>
         </div>
       </section>
 
-      {/* ---------- Marquee ticker ---------- */}
-      <div className="marquee">
-        <div className="marquee-track">
-          {[...TICKER, ...TICKER].map((item, i) => (
-            <span className="marquee-item" key={i}>
-              <span className="marquee-dot" />
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
 
-      {/* ---------- Stat strip ---------- */}
-      <section className="container" style={{ marginTop: 40, marginBottom: 8 }}>
-        <div className="bento">
-          <Reveal delay={0} className="span-4">
-            <div className="card glass stat-card">
-              <span className="stat-label">Backend</span>
-              <span className="stat-value" style={{ fontSize: 20 }}>
-                {backendUp === 'checking' ? 'Checking…' : backendUp === 'up' ? 'Reachable' : 'Unreachable'}
-              </span>
-              {backendUp !== 'checking' && (
-                <Pill tone={backendUp === 'up' ? 'success' : 'danger'}>{backendUp === 'up' ? 'online' : 'offline'}</Pill>
-              )}
-              <span className="field-hint">Live check against GET /health</span>
-            </div>
-          </Reveal>
-          <Reveal delay={80} className="span-4">
-            <StatCard label="This session" value={counts.total} hint="Verifications submitted from this browser" />
-          </Reveal>
-          <Reveal delay={160} className="span-4">
-            <StatCard label="Passed" value={counts.verified + counts.repaired} hint={`${counts.rejected} rejected, this session`} tone="success" />
-          </Reveal>
-        </div>
-      </section>
 
       {/* ---------- Feature rows (varied, alternating layout) ---------- */}
       <section className="container">
-        {FEATURES.map((f, i) => (
-          <div className={`feature-row ${i % 2 ? 'reverse' : ''}`} key={f.title}>
-            <Reveal variant={i % 2 ? 'right' : 'left'}>
-              <span className="eyebrow">{f.eyebrow}</span>
-              <h2 style={{ fontSize: 'var(--fs-xl)', margin: '10px 0 12px' }}>{f.title}</h2>
-              <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', maxWidth: 460 }}>{f.body}</p>
-            </Reveal>
-            <Reveal variant="scale" delay={100}>
-              <FeatureVisual kind={f.visual} />
-            </Reveal>
-          </div>
-        ))}
+        <div className="feature-timeline">
+          {FEATURES.map((f, i) => (
+            <div className={`feature-row ${i % 2 ? 'reverse' : ''}`} key={f.title} style={{ position: 'relative' }}>
+              <Reveal variant={i % 2 ? 'right' : 'left'}>
+                <div style={{ position: 'relative' }}>
+                  <div className="feature-number">0{i + 1}</div>
+                  <span className="eyebrow">{f.eyebrow}</span>
+                  <h2 style={{ fontSize: 'var(--fs-xl)', margin: '10px 0 12px' }}>{f.title}</h2>
+                  <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', maxWidth: 460 }}>{f.body}</p>
+                </div>
+              </Reveal>
+              <Reveal variant="scale" delay={100}>
+                <FeatureVisual kind={f.visual} />
+              </Reveal>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ---------- Pipeline: horizontal scroll-snap ---------- */}
@@ -260,7 +232,8 @@ export function Home() {
             The pipeline
           </div>
         </Reveal>
-        <div className="snap-strip">
+        <div className="snap-strip" style={{ position: 'relative' }}>
+          <div className="pipeline-connect" />
           {STEPS.map((s, i) => (
             <Reveal key={s.title} delay={i * 70}>
               <div className="card glass card-pad" style={{ width: 260, height: '100%' }}>
@@ -294,6 +267,27 @@ export function Home() {
             </div>
           </Reveal>
         </div>
+      </section>
+
+      {/* ---------- New CTA Section ---------- */}
+      <section className="container">
+        <Reveal>
+          <div className="cta-section">
+            <div className="cta-guilloche" />
+            <h2 style={{ fontSize: 'var(--fs-2xl)', marginBottom: 16 }}>Ready to verify your first output?</h2>
+            <p style={{ fontSize: 'var(--fs-md)', color: 'var(--text-muted)', maxWidth: 500, margin: '0 auto 32px' }}>
+              Drop in a schema, write a prompt, and see how Verified handles uncertain AI generations with cryptographically backed certainty.
+            </p>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link to="/verify" className="btn btn-accent" style={{ padding: '14px 28px', fontSize: 16 }}>
+                Start Verification
+              </Link>
+              <Link to="/about" className="btn btn-ghost" style={{ padding: '14px 28px', fontSize: 16, background: 'var(--glass-bg)' }}>
+                Read the Docs
+              </Link>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       {log.length > 0 && (

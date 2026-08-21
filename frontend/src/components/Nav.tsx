@@ -49,11 +49,24 @@ export function Nav() {
     };
   }, []);
 
+  const handleLinkClick = (to: string) => {
+    setOpen(false);
+    if (location.pathname === to || (to === '/' && location.pathname === '')) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="dock-wrap">
       <div className={`dock-row ${scrolled ? 'nav-scrolled' : ''}`}>
-        <Link to="/" className="dock-brand glass-strong" aria-label="Verified — home">
+        <Link
+          to="/"
+          className="dock-brand glass-strong"
+          aria-label="Verified — home"
+          onClick={() => handleLinkClick('/')}
+        >
           <Logo size={26} />
+          <span className="dock-brand-text">Verified</span>
         </Link>
 
         <nav className="dock-nav glass-strong" aria-label="Primary">
@@ -65,6 +78,7 @@ export function Nav() {
               ref={(el) => {
                 linkRefs.current[i] = el;
               }}
+              onClick={() => handleLinkClick(l.to)}
               className={`dock-link ${i === activeIndex ? 'active' : ''}`}
             >
               {l.label}
@@ -86,7 +100,13 @@ export function Nav() {
       {open && (
         <div className="dock-sheet glass-strong">
           {LINKS.map((l, i) => (
-            <Link key={l.to} to={l.to} onClick={() => setOpen(false)} className={`dock-link ${i === activeIndex ? 'active' : ''}`}>
+            <Link 
+              key={l.to} 
+              to={l.to} 
+              onClick={() => handleLinkClick(l.to)} 
+              className={`dock-link ${i === activeIndex ? 'active' : ''}`}
+              style={{ animationDelay: `${i * 40}ms` }}
+            >
               {l.label}
             </Link>
           ))}

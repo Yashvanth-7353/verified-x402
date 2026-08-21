@@ -87,6 +87,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body {
   margin: 0;
@@ -242,6 +246,21 @@ code,
   justify-content: center;
   pointer-events: none;
   padding: 0 16px;
+  animation: dock-enter 800ms var(--ease) both;
+}
+
+@keyframes dock-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dock-row {
@@ -257,23 +276,48 @@ code,
 .dock-nav,
 .dock-toggle {
   pointer-events: auto;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 32px -8px rgba(20, 22, 14, 0.1), 0 2px 6px -1px rgba(20, 22, 14, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .dock-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
+  width: auto;
   height: 52px;
+  padding: 0 18px;
   border-radius: 999px;
   flex-shrink: 0;
   text-decoration: none;
-  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease);
+  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), background 260ms var(--ease);
+}
+
+@media (max-width: 860px) {
+  .dock-brand {
+    width: 52px;
+    padding: 0;
+  }
+  .dock-brand-text {
+    display: none;
+  }
+}
+
+.dock-brand-text {
+  font-family: var(--grotesk);
+  font-weight: 700;
+  font-size: 17px;
+  margin-left: 8px;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
 .dock-brand:hover {
-  transform: scale(1.06) rotate(-4deg);
-  box-shadow: var(--shadow-md);
+  transform: scale(1.04) rotate(-2deg);
+  box-shadow: 0 14px 38px -6px rgba(20, 22, 14, 0.16), 0 3px 8px rgba(20, 22, 14, 0.06), inset 0 1px 1px 0 #ffffff;
 }
 
 .dock-nav {
@@ -283,7 +327,7 @@ code,
   gap: 2px;
   border-radius: 999px;
   padding: 6px;
-  transition: padding 260ms var(--ease);
+  transition: padding 260ms var(--ease), box-shadow 260ms var(--ease), background 260ms var(--ease);
 }
 
 .dock-pill {
@@ -292,9 +336,25 @@ code,
   bottom: 6px;
   left: 0;
   border-radius: 999px;
-  background: var(--text);
-  transition: transform 420ms var(--ease), width 420ms var(--ease), opacity 200ms var(--ease);
+  background: linear-gradient(135deg, var(--text) 0%, #2f3338 100%);
+  transition: transform 420ms var(--ease), width 420ms var(--ease), opacity 200ms var(--ease), top 260ms var(--ease), bottom 260ms var(--ease);
   z-index: 0;
+  box-shadow: 0 4px 14px rgba(20, 22, 14, 0.22);
+  overflow: hidden;
+}
+
+.dock-pill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  background-size: 200% 100%;
+  animation: pill-shimmer 3s infinite linear;
+}
+
+@keyframes pill-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .dock-link {
@@ -307,15 +367,19 @@ code,
   text-decoration: none;
   color: var(--text-muted);
   white-space: nowrap;
-  transition: color 260ms var(--ease);
+  transition: color 260ms var(--ease), background 260ms var(--ease);
 }
 
 .dock-link:hover {
   color: var(--text);
+  background: radial-gradient(circle at center, rgba(38, 62, 224, 0.07) 0%, transparent 70%);
 }
 
 .dock-link.active {
   color: #fff;
+}
+.dock-link.active:hover {
+  background: none;
 }
 
 .dock-toggle {
@@ -325,7 +389,7 @@ code,
   border-radius: 999px;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.85);
   cursor: pointer;
   color: var(--text);
 }
@@ -340,24 +404,42 @@ code,
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  animation: sheet-in 260ms var(--ease) both;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 48px -12px rgba(20, 22, 14, 0.18), inset 0 1px 1px 0 #ffffff;
+  animation: sheet-in 360ms var(--ease) both;
+  transform-origin: top center;
 }
 
 @keyframes sheet-in {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+    transform: translateY(-10px) scaleY(0.96);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translateY(0) scaleY(1);
   }
 }
 
 .dock-sheet .dock-link {
   padding: 12px 16px;
   color: var(--text);
+  animation: sheet-link-in 400ms var(--ease) both;
+}
+
+@keyframes sheet-link-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .dock-sheet .dock-link.active {
@@ -377,7 +459,21 @@ code,
 .nav-scrolled .dock-brand,
 .nav-scrolled .dock-nav,
 .nav-scrolled .dock-toggle {
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 16px 40px -10px rgba(20, 22, 14, 0.14), 0 3px 10px rgba(20, 22, 14, 0.05), inset 0 1px 1px 0 #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
+}
+.nav-scrolled .dock-nav {
+  padding: 4px;
+}
+.nav-scrolled .dock-brand {
+  height: 46px;
+}
+.nav-scrolled .dock-pill {
+  top: 4px;
+  bottom: 4px;
 }
 
 .footer-brand {
@@ -1618,15 +1714,26 @@ details.tech[open] summary {
   overflow: hidden;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  padding: 14px 0;
-  background: var(--glass-bg);
+  padding: 16px 0;
+  background: rgba(253, 253, 251, 0.65);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
 }
 
 .marquee-track {
   display: flex;
   width: max-content;
-  gap: 40px;
-  animation: marquee-scroll 34s linear infinite;
+  gap: 36px;
+  animation: marquee-scroll 32s linear infinite;
+  will-change: transform;
+}
+
+.marquee-track-reverse {
+  animation: marquee-scroll-reverse 36s linear infinite;
 }
 
 .marquee:hover .marquee-track {
@@ -1638,31 +1745,58 @@ details.tech[open] summary {
     transform: translateX(0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translateX(-33.333333%);
+  }
+}
+
+@keyframes marquee-scroll-reverse {
+  from {
+    transform: translateX(-33.333333%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 
 .marquee-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   font-family: var(--poster);
-  font-size: 20px;
-  letter-spacing: 0.03em;
+  font-size: 21px;
+  letter-spacing: 0.04em;
   color: var(--text-faint);
   white-space: nowrap;
+  transition: color 200ms var(--ease), transform 200ms var(--ease);
+  cursor: default;
 }
 
-.marquee-item strong {
+.marquee-item:hover {
   color: var(--accent-strong);
+  transform: scale(1.04);
 }
 
 .marquee-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--seal);
+  box-shadow: 0 0 8px rgba(166, 116, 31, 0.4);
   flex-shrink: 0;
+  animation: dot-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes dot-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+    box-shadow: 0 0 4px rgba(166, 116, 31, 0.3);
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(166, 116, 31, 0.6);
+  }
 }
 
 /* ---------- tilt cards ---------- */
@@ -1690,6 +1824,223 @@ details.tech[open] summary {
 .snap-strip > * {
   scroll-snap-align: start;
   flex: 0 0 auto;
+}
+
+/* ---------- NEW ENHANCEMENTS ---------- */
+
+/* 1. Hero floating particles */
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.15;
+  animation: float-particle 14s infinite ease-in-out alternate;
+}
+
+@keyframes float-particle {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(20px, -20px) scale(1.2); }
+}
+
+/* 2. Seal glow */
+.seal-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  opacity: 0.15;
+  border-radius: 50%;
+  z-index: -1;
+  animation: pulse-glow 4s infinite ease-in-out alternate;
+}
+
+@keyframes pulse-glow {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.15; }
+  100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.25; }
+}
+
+/* 3. Trust badges row */
+.trust-badges {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  padding: 4px 10px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+/* 4. Stat card gradient border */
+.stat-card-enhanced {
+  position: relative;
+  background: var(--glass-bg-strong);
+  border-radius: var(--radius-md);
+  z-index: 1;
+}
+
+.stat-card-enhanced::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--border), transparent, var(--border));
+  z-index: -1;
+  transition: opacity 0.3s;
+}
+
+.stat-card-enhanced:hover::before {
+  background: linear-gradient(135deg, var(--accent), var(--seal), var(--accent));
+  animation: border-shimmer 2s linear infinite;
+}
+
+@keyframes border-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* 5. Feature timeline connector */
+.feature-timeline {
+  position: relative;
+  padding-left: 24px;
+}
+
+.feature-timeline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background-image: linear-gradient(to bottom, var(--border-strong) 50%, transparent 50%);
+  background-size: 2px 8px;
+  background-repeat: repeat-y;
+}
+
+/* 6. Feature number */
+.feature-number {
+  font-family: var(--display);
+  font-size: 64px;
+  font-weight: 700;
+  color: var(--border);
+  opacity: 0.4;
+  position: absolute;
+  left: -40px;
+  top: -20px;
+  z-index: -1;
+}
+
+/* 7. Pipeline connection line */
+.pipeline-connect {
+  position: absolute;
+  top: 50%;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  z-index: -1;
+  opacity: 0.3;
+}
+
+/* 8. Pipeline card hover */
+.snap-strip .card {
+  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.snap-strip .card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* 9. CTA section */
+.cta-section {
+  padding: 80px 20px;
+  background: linear-gradient(135deg, #e0f2fe, #ffffff);
+  text-align: center;
+  border-radius: var(--radius-lg);
+  margin: 40px auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-guilloche {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 20% 50%, var(--accent) 1px, transparent 1px),
+                    radial-gradient(circle at 80% 50%, var(--accent) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* 10. Improved marquee */
+.marquee {
+  position: relative;
+}
+.marquee::before, .marquee::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100px;
+  z-index: 2;
+  pointer-events: none;
+}
+.marquee::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--glass-bg), transparent);
+}
+.marquee::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--glass-bg), transparent);
+}
+
+/* Mesh blobs updates */
+.mesh-blob {
+  opacity: 0.45;
+  filter: blur(80px);
+  transform: scale(1.1);
+}
+
+.mesh-blob.b4 {
+  width: 40vw;
+  height: 40vw;
+  top: 20vh;
+  left: 50vw;
+  background: radial-gradient(circle, rgba(242, 139, 130, 0.3), transparent 70%); /* soft coral */
+  animation-duration: 28s;
+  animation-delay: -5s;
+}
+
+.mesh-blob.b5 {
+  width: 35vw;
+  height: 35vw;
+  bottom: 10vh;
+  right: 40vw;
+  background: radial-gradient(circle, rgba(129, 212, 250, 0.3), transparent 70%); /* soft teal */
+  animation-duration: 35s;
+  animation-delay: -10s;
 }
 
 @media (prefers-reduced-motion: reduce) {

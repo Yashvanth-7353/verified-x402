@@ -5,6 +5,8 @@ export function MeshBackground() {
       <div className="mesh-blob b1" />
       <div className="mesh-blob b2" />
       <div className="mesh-blob b3" />
+      <div className="mesh-blob b4" />
+      <div className="mesh-blob b5" />
     </div>
   );
 }

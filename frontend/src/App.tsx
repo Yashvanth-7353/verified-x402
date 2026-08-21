@@ -17,7 +17,7 @@ import { About } from './pages/About';
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [pathname]);
   return null;
 }
