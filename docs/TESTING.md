@@ -113,7 +113,27 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - repair_summary_hash present for repaired, absent for verified.
 - No raw payload content in receipt.
 
-## 10. Audit / Merkle Anchoring Test Scenarios
+## 10. Local Verification Record Store Test Scenarios (Phase 9 — implemented)
+
+- Save a finalized record and retrieve by request_id — receipt_id, outcome, receipt_hash match.
+- Save a finalized record and retrieve by receipt_id — request_id, receipt_hash match.
+- receipt_hash is preserved exactly (not recalculated).
+- output_hash is preserved exactly.
+- All three outcomes (verified, verified_repaired, rejected) are persistable.
+- Semantic repaired record preserves payment_ref, payment_status=settled, algorand_tx_ref.
+- Duplicate save with same request_id + receipt_id is idempotent (no duplicate).
+- Duplicate save with same request_id but different receipt_id raises IntegrityError.
+- New records start as unanchored.
+- list_unanchored_records() returns new records with deterministic ordering.
+- mark_anchored() updates status and excludes from unanchored query.
+- Records survive database close/reopen (restart persistence).
+- Private keys, X-PAYMENT, recovery phrases, and raw payloads are never stored.
+- Nonexistent record queries return None.
+- Empty database returns empty list from list_unanchored_records().
+- Receipt and Result roundtrip correctly through serialization.
+- Multiple distinct records can be stored and retrieved.
+
+## 11. Audit / Merkle Anchoring Test Scenarios
 
 - Batch of N local records → confirm Merkle root is computed correctly and deterministically over their `receipt_hash` values.
 - Confirm the anchoring transaction submitted to Algorand contains only the Merkle root (and necessary transaction metadata) — explicitly assert no raw payload or unhashed receipt content appears in the transaction payload.

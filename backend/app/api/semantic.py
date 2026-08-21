@@ -33,12 +33,24 @@ from app.validation.engine import VerificationEngine
 from app.repair.semantic import SemanticRepairEngine
 from app.evidence.receipt import ReceiptService
 from app.models.api import SemanticRepairRequest, SemanticRepairResponse
+from app.storage.store import LocalVerificationRecordStore
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 VALIDATOR_VERSION = "0.1.0"
+
+# Phase 9: module-level record store (initialized lazily)
+_record_store: LocalVerificationRecordStore | None = None
+
+
+def _get_record_store() -> LocalVerificationRecordStore:
+    global _record_store
+    if _record_store is None:
+        _record_store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
+    return _record_store
 
 
 def _build_payment_metadata(
@@ -217,11 +229,28 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
 
         # Phase 8: Include payment_metadata only when semantic repair was attempted
         # with a settled payment (i.e., payment_metadata was created for this request)
-        return SemanticRepairResponse(
+        response = SemanticRepairResponse(
             result=final_result,
             receipt=receipt,
             payment_metadata=payment_metadata,
         )
+
+        # Phase 9: Persist the finalized record
+        try:
+            store = _get_record_store()
+            store.save(
+                result=final_result,
+                receipt=receipt,
+                payment_metadata=payment_metadata,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to persist semantic repair record for request_id=%s "
+                "(receipt still valid, persistence failure is separate concern)",
+                payload.request.request_id,
+            )
+
+        return response
 
     except HTTPException:
         raise

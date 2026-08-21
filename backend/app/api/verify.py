@@ -4,10 +4,22 @@ from pydantic import ValidationError as PydanticValidationError
 
 from app.models.api import VerifyPayloadRequest, VerifyPayloadResponse
 from app.services.orchestrator import VerificationOrchestrator
+from app.storage.store import LocalVerificationRecordStore
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Phase 9: module-level record store (initialized lazily)
+_record_store: LocalVerificationRecordStore | None = None
+
+
+def _get_record_store() -> LocalVerificationRecordStore:
+    global _record_store
+    if _record_store is None:
+        _record_store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
+    return _record_store
 
 
 @router.post(
@@ -31,6 +43,18 @@ def verify(payload: VerifyPayloadRequest) -> VerifyPayloadResponse:
     try:
         orchestrator = VerificationOrchestrator()
         result, receipt = orchestrator.process(payload.request, payload.policy)
+
+        # Phase 9: Persist the finalized record
+        try:
+            store = _get_record_store()
+            store.save(result=result, receipt=receipt)
+        except Exception:
+            logger.exception(
+                "Failed to persist verification record for request_id=%s "
+                "(receipt still valid, persistence failure is separate concern)",
+                payload.request.request_id,
+            )
+
         return VerifyPayloadResponse(result=result, receipt=receipt)
     except Exception as e:
         logger.exception("Unexpected error during verification")

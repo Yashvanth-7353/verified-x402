@@ -79,13 +79,21 @@ Depends on: Milestones 1–4 (needs outcomes from all paths).
 - [x] Phase 8: `repair_summary_hash` is present when repair occurred, absent otherwise.
 - [x] Phase 8: `receipt_hash` is deterministic (same data → same hash) and tamper-evident (any field change → different hash).
 
-## 8. Milestone 6 — Local Verification Record Store (MVP-critical)
+## 8. Milestone 6 — Local Verification Record Store (MVP-critical) ✅ Phase 9 complete
 
 Depends on: Milestone 5.
 
-- [ ] Implement persistence of `LocalVerificationRecord` (result + receipt + anchoring status).
-- [ ] Implement retrieval by `request_id`/`receipt_id` for later audit/demo purposes.
-- [ ] Confirm raw payload content is retained only locally and never included in any outward-facing artifact beyond what Milestone 4 already sends to the semantic-repair API.
+- [x] Implement persistence of `LocalVerificationRecord` (result + receipt + anchoring status) via SQLite.
+- [x] Implement retrieval by `request_id`/`receipt_id` for later audit/demo purposes.
+- [x] Confirm raw payload content is retained only locally and never included in any outward-facing artifact beyond what Milestone 4 already sends to the semantic-repair API.
+- [x] SQLite backend with WAL mode, auto-initialization, configurable path.
+- [x] Idempotent saves (same request_id + receipt_id is a no-op).
+- [x] Integrity conflict detection (same request_id, different receipt_id → IntegrityError).
+- [x] `list_unanchored_records()` with deterministic ordering for future Merkle batching.
+- [x] `mark_anchored()` for Phase 10 consumption.
+- [x] Privacy: no raw payloads, private keys, X-PAYMENT, or recovery phrases stored.
+- [x] Records survive process/database restart.
+- [x] 30 Phase 9 tests covering persistence, idempotency, anchoring, privacy, and restart.
 
 ## 9. Milestone 7 — Merkle Anchoring on Algorand (MVP-critical)
 
