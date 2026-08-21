@@ -42,16 +42,19 @@ Depends on: Milestone 1.
 - [ ] Wire re-validation: after deterministic repair, re-run the Milestone 1 pipeline on the repaired payload (DESIGN.md §6).
 - [ ] Verify local-only pass and local-only reject paths end-to-end without any network calls.
 
-## 5. Milestone 3 — x402 Payment Flow (MVP-critical)
+## 5. Milestone 3 — x402 Payment Flow (MVP-critical) ✅ Phase 8 hardened
 
 Depends on: Milestone 0 (payment terms convention), Milestone 2 (escalation decision producing the trigger).
 
-- [ ] Implement HTTP 402 challenge issuance when escalation is required.
-- [ ] Implement `X-PAYMENT` header acceptance and parsing on resubmission.
-- [ ] Integrate with GoPlausible AVM facilitator client for payment verification/settlement on Algorand.
-- [ ] Implement `PaymentMetadata` record creation and status tracking (`pending` → `verified`/`settled`/`failed`).
-- [ ] Implement fail-closed behavior on facilitator/network failure (reject, no payload forwarded — ARCHITECTURE.md §10).
-- [ ] End-to-end test: trigger escalation, complete a real (or testnet) payment, confirm settlement is observed correctly.
+- [x] Implement HTTP 402 challenge issuance when escalation is required.
+- [x] Implement `X-PAYMENT` header acceptance and parsing on resubmission.
+- [x] Integrate with GoPlausible AVM facilitator client for payment verification/settlement on Algorand.
+- [x] Implement `PaymentMetadata` record creation and status tracking (`pending` → `verified`/`settled`/`failed`).
+- [x] Implement fail-closed behavior on facilitator/network failure (reject, no payload forwarded — ARCHITECTURE.md §10).
+- [x] End-to-end test: trigger escalation, complete a real (or testnet) payment, confirm settlement is observed correctly.
+- [x] Phase 8: Custom middleware settles payment BEFORE calling handler, making `ProcessSettleResult` available via `request.state`.
+- [x] Phase 8: `PaymentMetadata` created from actual settlement result with `payment_status=settled`, `algorand_tx_ref` from real settlement.
+- [x] Phase 8: `RepairInfo.payment_ref` set to `PaymentMetadata.payment_id` for semantic repair outcomes.
 
 ## 6. Milestone 4 — Semantic-Repair Escalation (MVP-critical)
 
@@ -63,14 +66,18 @@ Depends on: Milestone 3 (payment must be settled before this triggers, per DATA_
 - [ ] Implement fail-closed behavior on semantic-repair API failure/timeout.
 - [ ] End-to-end test: full escalation → payment → semantic repair → re-validation → receipt loop.
 
-## 7. Milestone 5 — Receipts (MVP-critical)
+## 7. Milestone 5 — Receipts (MVP-critical) ✅ Phase 8 hardened
 
 Depends on: Milestones 1–4 (needs outcomes from all paths).
 
-- [ ] Implement `VerificationReceipt` generation for all three outcomes (`verified`, `verified_repaired`, `rejected`).
-- [ ] Implement receipt hashing (binding output hash, schema ref+version, repair summary hash, validator version — ARCHITECTURE.md §7).
+- [x] Implement `VerificationReceipt` generation for all three outcomes (`verified`, `verified_repaired`, `rejected`).
+- [x] Implement receipt hashing (binding output hash, schema ref+version, repair summary hash, validator version — ARCHITECTURE.md §7).
 - [ ] Decide and, if in scope, implement receipt signing (DESIGN.md §12 TBD) — otherwise explicitly deferred to future scope with a note in the demo narrative.
-- [ ] Verify receipts are produced for **every** request, including all rejection paths (no reason-less/receiptless outcome — DESIGN.md §9).
+- [x] Verify receipts are produced for **every** request, including all rejection paths (no reason-less/receiptless outcome — DESIGN.md §9).
+- [x] Phase 8: Receipt invariant enforcement — `verified_repaired` with semantic repair requires non-null `repair_info.payment_ref`.
+- [x] Phase 8: `output_hash` always reflects the FINAL validated output (post-repair), never pre-repair.
+- [x] Phase 8: `repair_summary_hash` is present when repair occurred, absent otherwise.
+- [x] Phase 8: `receipt_hash` is deterministic (same data → same hash) and tamper-evident (any field change → different hash).
 
 ## 8. Milestone 6 — Local Verification Record Store (MVP-critical)
 

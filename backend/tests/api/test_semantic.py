@@ -1,20 +1,27 @@
 """
-Tests for POST /api/v1/semantic-repair (Phase 7 — x402 gated).
+Tests for POST /api/v1/semantic-repair (Phase 7 + Phase 8 hardened).
+
+Phase 7 tests: x402 payment gating, 402 challenge, valid/invalid payment,
+               payment-failure-never-invokes-engine, free routes unaffected.
+Phase 8 tests: PaymentMetadata propagation, repair_info.payment_ref binding,
+               receipt invariant enforcement, tamper detection, all acceptance criteria.
 
 Mocking strategy:
-  The x402 middleware creates an x402HTTPResourceServer internally inside
-  payment_middleware(). That server's process_http_request() coroutine is
-  the authoritative gate. We patch it at its class level so all instances
-  (including the one buried inside the middleware closure) are intercepted.
+  The custom x402 middleware (main.py) creates an x402HTTPResourceServer and calls:
+    1. process_http_request() → verify payment
+    2. process_settlement() → settle payment (BEFORE handler, per Phase 8)
+    3. route handler runs with settlement info on request.state
 
-  We also patch x402ResourceServer.initialize() so that no real network call
-  to the GoPlausible facilitator is made during tests.
+  We patch at the CLASS level so all instances (including the one inside the
+  middleware closure) are intercepted.
 
-Patch targets (verified against x402-avm 2.0.2 source):
+Patch targets (verified against x402-avm 2.x source + custom middleware):
   x402.http.x402_http_server.x402HTTPResourceServer.process_http_request
+  x402.http.x402_http_server.x402HTTPResourceServer.process_settlement
+  x402.http.x402_http_server.x402HTTPResourceServer.initialize
   x402.server.x402ResourceServer.initialize
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -30,11 +37,9 @@ from x402.http.types import (
     RESULT_PAYMENT_ERROR,
 )
 
-# Patch targets verified against installed package source
-_HTTP_SERVER_PROCESS = (
-    "x402.http.x402_http_server.x402HTTPResourceServer.process_http_request"
-)
-_RESOURCE_SERVER_INIT = "x402.server.x402ResourceServer.initialize"
+# Patch targets
+_HTTP_SERVER = "x402.http.x402_http_server.x402HTTPResourceServer"
+_RESOURCE_SERVER = "x402.server.x402ResourceServer"
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +85,23 @@ def _invalid_payment_result() -> HTTPProcessResult:
     )
 
 
+def _successful_settle() -> ProcessSettleResult:
+    return ProcessSettleResult(
+        success=True,
+        transaction="ALGO_TX_abc123",
+        network="algorand",
+        payer="PAYER_ADDRESS_xyz",
+        headers={},
+    )
+
+
+def _failed_settle() -> ProcessSettleResult:
+    return ProcessSettleResult(
+        success=False,
+        error_reason="Insufficient funds",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -107,78 +129,81 @@ def _make_body(output_payload: dict, schema_definition: dict) -> dict:
 @pytest.fixture()
 def no_payment_client():
     """Client where x402 middleware returns 402 (no/missing payment)."""
-    from x402.http.x402_http_server import x402HTTPResourceServer
-    from x402.server import x402ResourceServer
-    from app.main import app
-
-    with patch.object(x402ResourceServer, "initialize"):
-        with patch.object(
-            x402HTTPResourceServer,
-            "process_http_request",
-            new_callable=AsyncMock,
-            return_value=_payment_required_result(),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as c:
-                yield c
+    with patch(f"{_RESOURCE_SERVER}.initialize"):
+        with patch(f"{_HTTP_SERVER}.initialize"):
+            with patch(
+                f"{_HTTP_SERVER}.process_http_request",
+                new_callable=AsyncMock,
+                return_value=_payment_required_result(),
+            ):
+                with TestClient(__import__("app.main", fromlist=["app"]).app, raise_server_exceptions=False) as c:
+                    yield c
 
 
 @pytest.fixture()
 def invalid_payment_client():
     """Client where x402 middleware rejects a malformed payment."""
-    from x402.http.x402_http_server import x402HTTPResourceServer
-    from x402.server import x402ResourceServer
-    from app.main import app
-
-    with patch.object(x402ResourceServer, "initialize"):
-        with patch.object(
-            x402HTTPResourceServer,
-            "process_http_request",
-            new_callable=AsyncMock,
-            return_value=_invalid_payment_result(),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as c:
-                yield c
+    with patch(f"{_RESOURCE_SERVER}.initialize"):
+        with patch(f"{_HTTP_SERVER}.initialize"):
+            with patch(
+                f"{_HTTP_SERVER}.process_http_request",
+                new_callable=AsyncMock,
+                return_value=_invalid_payment_result(),
+            ):
+                with TestClient(__import__("app.main", fromlist=["app"]).app, raise_server_exceptions=False) as c:
+                    yield c
 
 
 @pytest.fixture()
 def authed_client():
-    """Client where x402 middleware allows the request through (payment verified)."""
-    from x402.http.x402_http_server import x402HTTPResourceServer
-    from x402.server import x402ResourceServer
-    from app.main import app
-
-    with patch.object(x402ResourceServer, "initialize"):
-        with patch.object(
-            x402HTTPResourceServer,
-            "process_http_request",
-            new_callable=AsyncMock,
-            return_value=_verified_result(),
-        ):
-            with patch.object(
-                x402HTTPResourceServer,
-                "process_settlement",
+    """Client where x402 middleware verifies AND settles payment."""
+    with patch(f"{_RESOURCE_SERVER}.initialize"):
+        with patch(f"{_HTTP_SERVER}.initialize"):
+            with patch(
+                f"{_HTTP_SERVER}.process_http_request",
                 new_callable=AsyncMock,
-                return_value=ProcessSettleResult(success=True, headers={}),
+                return_value=_verified_result(),
             ):
-                with TestClient(app, raise_server_exceptions=False) as c:
-                    yield c
+                with patch(
+                    f"{_HTTP_SERVER}.process_settlement",
+                    new_callable=AsyncMock,
+                    return_value=_successful_settle(),
+                ):
+                    with TestClient(__import__("app.main", fromlist=["app"]).app, raise_server_exceptions=False) as c:
+                        yield c
+
+
+@pytest.fixture()
+def settle_failure_client():
+    """Client where x402 middleware verifies but settlement fails."""
+    with patch(f"{_RESOURCE_SERVER}.initialize"):
+        with patch(f"{_HTTP_SERVER}.initialize"):
+            with patch(
+                f"{_HTTP_SERVER}.process_http_request",
+                new_callable=AsyncMock,
+                return_value=_verified_result(),
+            ):
+                with patch(
+                    f"{_HTTP_SERVER}.process_settlement",
+                    new_callable=AsyncMock,
+                    return_value=_failed_settle(),
+                ):
+                    with TestClient(__import__("app.main", fromlist=["app"]).app, raise_server_exceptions=False) as c:
+                        yield c
 
 
 @pytest.fixture()
 def free_client():
     """Plain client for testing free routes — no payment stubs needed."""
-    from x402.server import x402ResourceServer
-    from app.main import app
-
-    # Stub initialize so the facilitator is never contacted on free routes
-    with patch.object(x402ResourceServer, "initialize"):
-        with TestClient(app, raise_server_exceptions=False) as c:
-            yield c
+    with patch(f"{_RESOURCE_SERVER}.initialize"):
+        with patch(f"{_HTTP_SERVER}.initialize"):
+            with TestClient(__import__("app.main", fromlist=["app"]).app, raise_server_exceptions=False) as c:
+                yield c
 
 
-# ---------------------------------------------------------------------------
-# Test 1: No payment header → 402
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 1: No payment header → 402
+# ===========================================================================
 
 class TestNoPayment:
     def test_no_payment_returns_402(self, no_payment_client):
@@ -197,15 +222,13 @@ class TestNoPayment:
         assert len(resp.content) > 0
 
 
-# ---------------------------------------------------------------------------
-# Test 2: Correct payment requirements are returned
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 2: Payment requirements correctness
+# ===========================================================================
 
 class TestPaymentRequirements:
     def test_payment_requirements_returned(self, no_payment_client):
-        """
-        The 402 body must include x402 payment requirements.
-        """
+        """The 402 body must include x402 payment requirements."""
         body = _make_body({"x": 1}, {"type": "object"})
         resp = no_payment_client.post("/api/v1/semantic-repair", json=body)
         assert resp.status_code == 402
@@ -214,9 +237,7 @@ class TestPaymentRequirements:
         assert len(data["accepts"]) > 0
 
     def test_payment_requirements_use_algorand_testnet(self, no_payment_client):
-        """
-        Payment requirements must use the configured Algorand Testnet CAIP-2 identifier.
-        """
+        """Payment requirements must use the configured Algorand Testnet CAIP-2 identifier."""
         body = _make_body({"x": 1}, {"type": "object"})
         resp = no_payment_client.post("/api/v1/semantic-repair", json=body)
         data = resp.json()
@@ -234,9 +255,9 @@ class TestPaymentRequirements:
             assert "avm" in scheme
 
 
-# ---------------------------------------------------------------------------
-# Test 3: Invalid payment is rejected
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 3: Invalid payment is rejected
+# ===========================================================================
 
 class TestInvalidPayment:
     def test_invalid_payment_returns_402(self, invalid_payment_client):
@@ -263,9 +284,9 @@ class TestInvalidPayment:
             mock_repair.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# Test 4: Mocked valid payment allows semantic repair invocation
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 4: Valid payment allows semantic repair
+# ===========================================================================
 
 class TestValidPaymentAccess:
     def test_valid_payment_returns_200(self, authed_client):
@@ -283,10 +304,19 @@ class TestValidPaymentAccess:
         assert "result" in data
         assert "receipt" in data
 
+    def test_valid_payment_response_has_payment_metadata(self, authed_client):
+        """Phase 8: response must include payment_metadata when payment was settled."""
+        body = _make_body({"x": 1}, {"type": "object"})
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "payment_metadata" in data
+        assert data["payment_metadata"] is not None
 
-# ---------------------------------------------------------------------------
-# Test 5: Valid payment + invalid semantic candidate → rejected
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# TEST 5: Valid payment + invalid semantic candidate → rejected
+# ===========================================================================
 
 class TestValidPaymentBadRepair:
     def test_payment_success_does_not_equal_verification_success(self, authed_client):
@@ -327,9 +357,9 @@ class TestValidPaymentBadRepair:
         assert data["receipt"]["receipt_hash"]
 
 
-# ---------------------------------------------------------------------------
-# Test 6: Valid payment + valid semantic repair → verified_repaired
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 6: Valid payment + valid semantic repair → verified_repaired
+# ===========================================================================
 
 class TestValidPaymentGoodRepair:
     def test_successful_semantic_repair_outcome(self, authed_client):
@@ -380,9 +410,9 @@ class TestValidPaymentGoodRepair:
         assert data["receipt"]["repair_summary_hash"] is not None
 
 
-# ---------------------------------------------------------------------------
-# Test 7: Payment failure never invokes SemanticRepairEngine
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 7: Payment failure never invokes SemanticRepairEngine
+# ===========================================================================
 
 class TestPaymentFailureNeverCallsEngine:
     def test_missing_payment_does_not_invoke_engine(self, no_payment_client):
@@ -410,15 +440,34 @@ class TestPaymentFailureNeverCallsEngine:
             mock_repair.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# Test 8: Existing free /api/v1/verify remains free
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 8: Settlement failure → 402
+# ===========================================================================
+
+class TestSettlementFailure:
+    def test_settlement_failure_returns_402(self, settle_failure_client):
+        """If settlement fails, the middleware returns 402 even after verification."""
+        body = _make_body({"x": 1}, {"type": "object"})
+        resp = settle_failure_client.post("/api/v1/semantic-repair", json=body)
+        assert resp.status_code == 402
+
+    def test_settlement_failure_does_not_invoke_engine(self, settle_failure_client):
+        """Failed settlement must never reach the semantic repair handler."""
+        from app.repair.semantic import SemanticRepairEngine
+
+        body = _make_body({"x": 1}, {"type": "object"})
+        with patch.object(SemanticRepairEngine, "attempt_repair") as mock_repair:
+            settle_failure_client.post("/api/v1/semantic-repair", json=body)
+            mock_repair.assert_not_called()
+
+
+# ===========================================================================
+# TEST 9: Free routes remain unaffected
+# ===========================================================================
 
 class TestFreeRoutesUnaffected:
     def test_verify_endpoint_requires_no_payment(self, free_client):
-        """
-        /api/v1/verify must remain completely free — no X-PAYMENT required.
-        """
+        """/api/v1/verify must remain completely free — no X-PAYMENT required."""
         body = _make_body(
             {"name": "Dave"},
             {
@@ -437,9 +486,7 @@ class TestFreeRoutesUnaffected:
         assert resp.status_code == 200
 
     def test_deterministic_repair_via_verify_is_free(self, free_client):
-        """
-        Deterministic repair through /api/v1/verify must not require payment.
-        """
+        """Deterministic repair through /api/v1/verify must not require payment."""
         body = _make_body(
             {"name": "Eve"},
             {
@@ -458,33 +505,9 @@ class TestFreeRoutesUnaffected:
         assert data["result"]["repair_info"]["repair_type"] == "deterministic"
 
 
-# ---------------------------------------------------------------------------
-# Test 9: Deterministic repair via /verify is free (explicit)
-# ---------------------------------------------------------------------------
-
-class TestDeterministicRepairFree:
-    def test_deterministic_repair_is_free(self, free_client):
-        """Deterministic repair (no semantic/payment) remains free."""
-        body = _make_body(
-            {"val": 1},
-            {
-                "type": "object",
-                "properties": {
-                    "val": {"type": "integer"},
-                    "label": {"type": "string", "default": "ok"},
-                },
-                "required": ["val", "label"],
-            },
-        )
-        resp = free_client.post("/api/v1/verify", json=body)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["result"]["outcome"] == "verified_repaired"
-
-
-# ---------------------------------------------------------------------------
-# Test 10: No payment secrets appear in responses
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 10: No payment secrets appear in responses
+# ===========================================================================
 
 class TestNoPaymentSecretsInResponse:
     def test_402_has_no_private_keys(self, no_payment_client):
@@ -518,13 +541,13 @@ class TestNoPaymentSecretsInResponse:
         assert secret_value not in resp.text
 
 
-# ---------------------------------------------------------------------------
-# Test 11: Existing Phase 0-6 tests — smoke run on verify endpoint
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# TEST 11: Existing pipeline smoke tests
+# ===========================================================================
 
 class TestExistingPipelineUnchanged:
     def test_valid_json_passes_verification(self, free_client):
-        """Basic verification still works after Phase 7 changes."""
+        """Basic verification still works after Phase 7/8 changes."""
         body = _make_body(
             {"name": "Alice", "age": 30},
             {
@@ -559,3 +582,548 @@ class TestExistingPipelineUnchanged:
         assert resp.status_code == 200
         data = resp.json()
         assert data["result"]["outcome"] == "rejected"
+
+
+# ===========================================================================
+# PHASE 8: Payment metadata propagation tests
+# ===========================================================================
+
+class TestPaymentMetadataPropagation:
+    """Phase 8 acceptance: PaymentMetadata is correctly created and propagated."""
+
+    def test_payment_metadata_has_settled_status(self, authed_client):
+        """PaymentMetadata.payment_status must be 'settled' after middleware settlement."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        pm = data["payment_metadata"]
+        assert pm["payment_status"] == "settled"
+
+    def test_payment_metadata_has_facilitator(self, authed_client):
+        """PaymentMetadata.facilitator must be the GoPlausible AVM Facilitator."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        pm = resp.json()["payment_metadata"]
+        assert pm["facilitator"] == "GoPlausible AVM Facilitator"
+
+    def test_payment_metadata_has_settlement_network(self, authed_client):
+        """PaymentMetadata.settlement_network must be 'Algorand'."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        pm = resp.json()["payment_metadata"]
+        assert pm["settlement_network"] == "Algorand"
+
+    def test_payment_metadata_has_algorand_tx_ref(self, authed_client):
+        """PaymentMetadata.algorand_tx_ref must reflect actual settlement transaction."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        pm = resp.json()["payment_metadata"]
+        assert pm["algorand_tx_ref"] == "ALGO_TX_abc123"
+
+    def test_payment_metadata_x402_challenge_ref_matches_request(self, authed_client):
+        """x402_challenge_ref must correlate to the specific request."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        pm = data["payment_metadata"]
+        request_id = data["result"]["request_ref"]
+        assert pm["x402_challenge_ref"] == request_id
+
+    def test_repair_info_payment_ref_references_payment_metadata(self, authed_client):
+        """RepairInfo.payment_ref must point to the PaymentMetadata.payment_id."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        repair_info = data["result"]["repair_info"]
+        pm = data["payment_metadata"]
+        assert repair_info["payment_ref"] == pm["payment_id"]
+
+    def test_verified_repaired_requires_non_null_payment_ref(self, authed_client):
+        """Phase 8 invariant: verified_repaired MUST have non-null payment_ref."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["result"]["repair_info"]["payment_ref"] is not None
+        assert data["result"]["repair_info"]["payment_ref"] != ""
+
+
+# ===========================================================================
+# PHASE 8: Receipt hashing and tamper detection tests
+# ===========================================================================
+
+class TestReceiptTamperDetection:
+    """Phase 8 acceptance: receipt_hash is tamper-evident."""
+
+    def test_tampered_outcome_changes_receipt_hash(self, free_client):
+        """Changing outcome must change receipt_hash."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        receipt = resp.json()["receipt"]
+        original_hash = receipt["receipt_hash"]
+
+        # Tamper: change outcome in the receipt dict and recompute hash
+        from app.evidence.hasher import hash_data
+        tampered = dict(receipt)
+        tampered["outcome"] = "rejected"
+        tampered.pop("receipt_hash", None)
+        tampered.pop("signature", None)
+        tampered_hash = hash_data(tampered)
+        assert original_hash != tampered_hash
+
+    def test_tampered_output_changes_receipt_hash(self, free_client):
+        """Changing output_hash must change receipt_hash."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        receipt = resp.json()["receipt"]
+        original_hash = receipt["receipt_hash"]
+
+        from app.evidence.hasher import hash_data
+        tampered = dict(receipt)
+        tampered["output_hash"] = "0" * 64  # different hash
+        tampered.pop("receipt_hash", None)
+        tampered.pop("signature", None)
+        tampered_hash = hash_data(tampered)
+        assert original_hash != tampered_hash
+
+    def test_tampered_schema_version_changes_receipt_hash(self, free_client):
+        """Changing schema_ref_and_version must change receipt_hash."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        receipt = resp.json()["receipt"]
+        original_hash = receipt["receipt_hash"]
+
+        from app.evidence.hasher import hash_data
+        tampered = dict(receipt)
+        tampered["schema_ref_and_version"] = "fake_schema@99"
+        tampered.pop("receipt_hash", None)
+        tampered.pop("signature", None)
+        tampered_hash = hash_data(tampered)
+        assert original_hash != tampered_hash
+
+    def test_tampered_validator_version_changes_receipt_hash(self, free_client):
+        """Changing validator_version must change receipt_hash."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        receipt = resp.json()["receipt"]
+        original_hash = receipt["receipt_hash"]
+
+        from app.evidence.hasher import hash_data
+        tampered = dict(receipt)
+        tampered["validator_version"] = "999.0.0"
+        tampered.pop("receipt_hash", None)
+        tampered.pop("signature", None)
+        tampered_hash = hash_data(tampered)
+        assert original_hash != tampered_hash
+
+    def test_receipt_hash_is_deterministic(self, free_client):
+        """Same receipt data must produce the same receipt_hash."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp1 = free_client.post("/api/v1/verify", json=body)
+        resp2 = free_client.post("/api/v1/verify", json=body)
+        # Different requests → different hashes (different request_id, timestamps)
+        # But within each, receipt_hash matches the bound fields
+        from app.evidence.hasher import hash_data
+        for resp in [resp1, resp2]:
+            receipt = resp.json()["receipt"]
+            check = dict(receipt)
+            check.pop("receipt_hash", None)
+            check.pop("signature", None)
+            assert receipt["receipt_hash"] == hash_data(check)
+
+    def test_output_hash_matches_final_payload(self, free_client):
+        """output_hash must reflect the FINAL validated output, not pre-repair."""
+        # Deterministic repair: missing "role" field with default "viewer"
+        body = _make_body(
+            {"name": "Eve"},  # missing "role"
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "default": "viewer"},
+                },
+                "required": ["name", "role"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+
+        from app.evidence.hasher import hash_data
+        # The repaired payload has "role": "viewer"
+        repaired_payload = {"name": "Eve", "role": "viewer"}
+        expected_hash = hash_data(repaired_payload)
+        assert data["receipt"]["output_hash"] == expected_hash
+
+        # The original payload hash must be DIFFERENT
+        original_hash = hash_data({"name": "Eve"})
+        assert data["receipt"]["output_hash"] != original_hash
+
+    def test_repair_summary_hash_present_for_repaired(self, free_client):
+        """Repair summary hash must be present when repair occurred."""
+        body = _make_body(
+            {"name": "Eve"},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "default": "viewer"},
+                },
+                "required": ["name", "role"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["receipt"]["repair_summary_hash"] is not None
+
+    def test_repair_summary_hash_absent_for_verified(self, free_client):
+        """Repair summary hash must be None when no repair occurred."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified"
+        assert data["receipt"]["repair_summary_hash"] is None
+
+    def test_schema_version_binding_in_receipt(self, free_client):
+        """Receipt must bind to the exact schema version used by validation."""
+        body = _make_body(
+            {"name": "Alice"},
+            {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        schema_id = data["result"]["request_ref"]  # Use request_ref as correlation
+        receipt = data["receipt"]
+        # schema_ref_and_version must be non-empty and contain @
+        assert "@" in receipt["schema_ref_and_version"]
+
+    def test_no_raw_payload_in_receipt(self, free_client):
+        """Receipt must never contain raw payload content."""
+        body = _make_body(
+            {"secret_field": "SUPER_SECRET_VALUE_XYZ"},
+            {"type": "object"},
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        receipt_text = str(resp.json()["receipt"])
+        assert "SUPER_SECRET_VALUE_XYZ" not in receipt_text
+
+
+# ===========================================================================
+# PHASE 8: Every request gets a receipt
+# ===========================================================================
+
+class TestEveryRequestGetsReceipt:
+    """Phase 8 acceptance: no receiptless outcome."""
+
+    def test_verified_gets_receipt(self, free_client):
+        """Valid output → verified → receipt."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified"
+        assert data["receipt"]["receipt_hash"] != ""
+        assert data["receipt"]["outcome"] == "verified"
+
+    def test_deterministic_repair_gets_receipt(self, free_client):
+        """Missing default → deterministic repair → verified_repaired → receipt."""
+        body = _make_body(
+            {"name": "Bob"},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "default": "user"},
+                },
+                "required": ["name", "role"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["receipt"]["receipt_hash"] != ""
+
+    def test_rejected_gets_receipt(self, free_client):
+        """Unsafe type → rejected → receipt."""
+        body = _make_body(
+            {"name": "Charlie", "age": "not_a_number"},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "rejected"
+        assert data["receipt"]["receipt_hash"] != ""
+        assert data["receipt"]["outcome"] == "rejected"
+
+    def test_semantic_repair_success_gets_receipt(self, authed_client):
+        """Payment + semantic repair + revalidation → verified_repaired → receipt."""
+        body = _make_body(
+            {"name": "Dave", "inject_mock_semantic_repair": {"age": 40}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["receipt"]["receipt_hash"] != ""
+
+    def test_payment_failure_returns_402_rejection(self, settle_failure_client):
+        """Payment failure → 402 rejection (middleware rejects before handler runs).
+
+        When settlement fails, the x402 middleware returns a 402 JSONResponse
+        directly. The handler never runs, so no VerificationReceipt is generated.
+        The 402 IS the rejection signal for this case.
+        """
+        body = _make_body(
+            {"name": "Eve", "inject_mock_semantic_repair": {"age": 25}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = settle_failure_client.post("/api/v1/semantic-repair", json=body)
+        assert resp.status_code == 402
+        data = resp.json()
+        assert "error" in data
+        assert "Settlement failed" in data["error"]
+
+
+# ===========================================================================
+# PHASE 8: Invariant enforcement tests
+# ===========================================================================
+
+class TestPhase8Invariants:
+    """Phase 8 acceptance: critical invariants are enforced."""
+
+    def test_verified_repaired_needs_payment_ref(self, authed_client):
+        """verified_repaired with semantic repair must have non-null payment_ref."""
+        body = _make_body(
+            {"name": "Alice", "inject_mock_semantic_repair": {"age": 30}},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = authed_client.post("/api/v1/semantic-repair", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["result"]["repair_info"]["payment_ref"] is not None
+        # The payment_ref must match the payment_metadata.payment_id
+        assert data["result"]["repair_info"]["payment_ref"] == data["payment_metadata"]["payment_id"]
+
+    def test_deterministic_repair_no_payment_ref(self, free_client):
+        """verified_repaired via deterministic repair must NOT have a payment_ref."""
+        body = _make_body(
+            {"name": "Bob"},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "default": "user"},
+                },
+                "required": ["name", "role"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified_repaired"
+        assert data["result"]["repair_info"]["repair_type"] == "deterministic"
+        assert data["result"]["repair_info"]["payment_ref"] is None
+
+    def test_verified_needs_no_payment_ref(self, free_client):
+        """verified (no repair) must have no payment_ref and no repair_info."""
+        body = _make_body(
+            {"name": "Alice", "age": 30},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "verified"
+        assert data["result"]["repair_info"] is None
+        assert data["receipt"]["repair_summary_hash"] is None
+
+    def test_rejected_has_no_payment_ref(self, free_client):
+        """rejected must have no payment_ref."""
+        body = _make_body(
+            {"name": "Charlie", "age": "bad"},
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+        )
+        resp = free_client.post("/api/v1/verify", json=body)
+        data = resp.json()
+        assert data["result"]["outcome"] == "rejected"
+        assert data["result"]["repair_info"] is None

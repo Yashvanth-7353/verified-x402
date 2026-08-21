@@ -64,6 +64,21 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Facilitator reports settlement failure (e.g., insufficient funds, per whatever Algorand testnet failure mode is used in testing) → confirm rejection, no semantic-repair call made.
 - Confirm `PaymentMetadata.payment_status` transitions are recorded accurately for each of the above (`pending` → `verified`/`settled`/`failed`).
 
+### Phase 8 payment metadata tests (implemented)
+
+- Settlement failure → 402 rejection, no handler invoked.
+- Settlement failure never invokes SemanticRepairEngine.
+- Successful settlement creates `PaymentMetadata` with `payment_status=settled`.
+- `PaymentMetadata.facilitator` = "GoPlausible AVM Facilitator".
+- `PaymentMetadata.settlement_network` = "Algorand".
+- `PaymentMetadata.algorand_tx_ref` reflects actual settlement transaction.
+- `PaymentMetadata.x402_challenge_ref` matches the request_id.
+- `RepairInfo.payment_ref` references `PaymentMetadata.payment_id`.
+- `verified_repaired` requires non-null `payment_ref` (Phase 8 invariant).
+- `verified_repaired` with semantic repair cannot occur without settled payment.
+- Failed payment cannot produce `verified_repaired`.
+- Deterministic repair (free path) has `payment_ref=None`.
+
 ## 7. Semantic-Repair Integration Test Scenarios
 
 - Successful escalation with a valid candidate fix returned → confirm the candidate is re-validated, not trusted directly.
@@ -85,6 +100,18 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Changing any bound field (output, schema ref/version, repair summary, validator version) changes `receipt_hash` — confirms tamper-evidence at the hashing level (Architecture Principle 7).
 - A receipt for a `verified_repaired` outcome has a non-null `repair_summary_hash` and a `payment_ref` with `payment_status = settled`; a receipt for a `verified` (non-repaired) outcome does not require a payment ref — confirms the DATA_MODEL.md §4 invariant.
 - Attempted tampering with a stored receipt (e.g., manually altering `outcome` in test fixtures) is detectable by recomputing and comparing `receipt_hash`.
+- `receipt_hash` determinism: the same logical receipt always produces the same hash.
+- `repair_summary_hash` is deterministic: the same `RepairInfo` always produces the same hash; a change to `RepairInfo` changes `repair_summary_hash`.
+
+### Phase 8 receipt tests (implemented)
+
+- Tamper outcome → hash changes.
+- Tamper output_hash → hash changes.
+- Tamper schema_ref_and_version → hash changes.
+- Tamper validator_version → hash changes.
+- output_hash matches FINAL payload (not pre-repair).
+- repair_summary_hash present for repaired, absent for verified.
+- No raw payload content in receipt.
 
 ## 10. Audit / Merkle Anchoring Test Scenarios
 
