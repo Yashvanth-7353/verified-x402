@@ -161,3 +161,54 @@ export class ApiError extends Error {
     this.challenge = challenge;
   }
 }
+
+// ---- Phase 15: Server-side records ----
+
+export interface RecordSummary {
+  record_id: string;
+  request_id: string;
+  receipt_id: string;
+  outcome: VerificationOutcome;
+  receipt_hash: string;
+  output_hash: string | null;
+  payment_status: PaymentStatus | null;
+  anchoring_status: string;
+  merkle_root: string | null;
+  anchor_tx_ref: string | null;
+  created_at: string;
+  schema_ref_and_version?: string | null;
+  validator_version?: string | null;
+  signing_key_id?: string | null;
+  signature_algorithm?: string | null;
+  repair_type?: string | null;
+  payment_facilitator?: string | null;
+  settlement_network?: string | null;
+}
+
+export interface RecordsListResponse {
+  records: RecordSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+// ---- Phase 15: Merkle inclusion proof ----
+
+export interface ProofNode {
+  hash: string;
+  position: 'left' | 'right';
+}
+
+export interface MerkleProofResponse {
+  record_id: string;
+  receipt_hash: string;
+  merkle_root: string;
+  leaf_index: number;
+  batch_size: number;
+  proof: ProofNode[];
+  anchor_tx_ref: string | null;
+  verification: {
+    valid: boolean;
+    details: string;
+  };
+}

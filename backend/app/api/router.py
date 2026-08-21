@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import health, verify, semantic, anchor, receipt
+from app.api import health, verify, semantic, anchor, receipt, records, proof
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -23,4 +23,14 @@ api_router.include_router(
     receipt.router,
     prefix=settings.API_V1_STR,
     tags=["receipt-verification"],
+)
+api_router.include_router(
+    records.router,
+    prefix=settings.API_V1_STR,
+    tags=["records"],
+)
+api_router.include_router(
+    proof.router,
+    prefix=settings.API_V1_STR,
+    tags=["merkle-proof"],
 )

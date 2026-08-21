@@ -2,9 +2,11 @@ import {
   ApiError,
   type AnchorResponse,
   type HealthResponse,
+  type MerkleProofResponse,
   type PaymentRequiredChallenge,
   type PublicKeyResponse,
   type ReceiptVerifyResponse,
+  type RecordsListResponse,
   type SchemaPolicy,
   type SemanticRepairResponse,
   type VerificationReceipt,
@@ -118,4 +120,16 @@ export function verifyReceipt(receipt: VerificationReceipt): Promise<ReceiptVeri
 
 export function publicKey(): Promise<PublicKeyResponse> {
   return request('/api/v1/receipt/public-key');
+}
+
+// ---- Phase 15: Server-side records ----
+
+export function listRecords(offset = 0, limit = 50): Promise<RecordsListResponse> {
+  return request(`/api/v1/records?offset=${offset}&limit=${limit}`);
+}
+
+// ---- Phase 15: Merkle inclusion proof ----
+
+export function getMerkleProof(recordId: string): Promise<MerkleProofResponse> {
+  return request(`/api/v1/anchor/proof/${recordId}`);
 }

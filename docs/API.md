@@ -16,6 +16,9 @@
 | POST | `/api/v1/anchor` | None | Trigger Merkle anchoring |
 | POST | `/api/v1/receipt/verify` | None | Verify signed receipt |
 | GET | `/api/v1/receipt/public-key` | None | Get public verification key |
+| GET | `/api/v1/records` | None | List persisted verification records |
+| GET | `/api/v1/records/{record_id}` | None | Get a specific verification record |
+| GET | `/api/v1/anchor/proof/{record_id}` | None | Get Merkle inclusion proof |
 
 ---
 
@@ -282,7 +285,110 @@ Returns the public Ed25519 key for independent receipt verification.
 
 ---
 
-## 7. Error Response Structure
+## 7. GET /api/v1/records
+
+List persisted verification records from the local SQLite store.
+
+**Query Parameters:**
+- `offset` (int, default 0) — Number of records to skip
+- `limit` (int, default 50, max 200) — Maximum records to return
+
+**Response 200:**
+```json
+{
+  "records": [
+    {
+      "record_id": "uuid",
+      "request_id": "uuid",
+      "receipt_id": "uuid",
+      "outcome": "verified_repaired",
+      "receipt_hash": "sha256-hex",
+      "output_hash": "sha256-hex",
+      "payment_status": "settled",
+      "anchoring_status": "anchored",
+      "merkle_root": "sha256-hex" | null,
+      "anchor_tx_ref": "algorand-tx-id" | null,
+      "created_at": "ISO 8601"
+    }
+  ],
+  "total": 42,
+  "offset": 0,
+  "limit": 50
+}
+```
+
+**Errors:**
+- `500` — Failed to retrieve records
+
+---
+
+## 8. GET /api/v1/records/{record_id}
+
+Get a specific verification record by ID.
+
+**Response 200:**
+```json
+{
+  "record_id": "uuid",
+  "request_id": "uuid",
+  "receipt_id": "uuid",
+  "outcome": "verified_repaired",
+  "receipt_hash": "sha256-hex",
+  "output_hash": "sha256-hex",
+  "payment_status": "settled",
+  "anchoring_status": "anchored",
+  "merkle_root": "sha256-hex",
+  "anchor_tx_ref": "algorand-tx-id",
+  "created_at": "ISO 8601",
+  "schema_ref_and_version": "schema@1.0",
+  "validator_version": "0.1.0",
+  "signing_key_id": "hex-16",
+  "signature_algorithm": "Ed25519",
+  "repair_type": "semantic",
+  "payment_facilitator": "GoPlausible AVM Facilitator",
+  "settlement_network": "Algorand"
+}
+```
+
+**Errors:**
+- `404` — Record not found
+- `500` — Failed to retrieve record
+
+---
+
+## 9. GET /api/v1/anchor/proof/{record_id}
+
+Generate a Merkle inclusion proof for an anchored verification record.
+
+**Response 200:**
+```json
+{
+  "record_id": "uuid",
+  "receipt_hash": "sha256-hex",
+  "merkle_root": "sha256-hex",
+  "leaf_index": 3,
+  "batch_size": 10,
+  "proof": [
+    { "hash": "sha256-hex", "position": "left" },
+    { "hash": "sha256-hex", "position": "right" },
+    { "hash": "sha256-hex", "position": "left" }
+  ],
+  "anchor_tx_ref": "algorand-tx-id",
+  "verification": {
+    "valid": true,
+    "details": "Proof verified: leaf 3 of 10 in batch with root a1b2c3..."
+  }
+}
+```
+
+**Errors:**
+- `404` — Record not found
+- `400` — Record is not anchored
+- `500` — Failed to generate proof
+
+---
+
+## 10. Error Response Structure
 
 All errors follow a consistent pattern:
 

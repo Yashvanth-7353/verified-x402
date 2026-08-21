@@ -428,6 +428,137 @@ class LocalVerificationRecordStore:
         """Deserialize the result from a record."""
         return _deserialize_result(record.result_json)
 
+    # -----------------------------------------------------------------------
+    # Frontend API support (Phase 15)
+    # -----------------------------------------------------------------------
+
+    def list_records(self, offset: int = 0, limit: int = 50) -> list[dict]:
+        """
+        Return a page of records as plain dicts for the frontend API.
+
+        Args:
+            offset: Number of records to skip.
+            limit: Maximum records to return.
+
+        Returns:
+            List of dicts with safe metadata fields.
+        """
+        conn = self._get_conn()
+        rows = conn.execute(
+            """
+            SELECT record_id, request_id, receipt_id, outcome, receipt_hash,
+                   output_hash, anchoring_status, merkle_root, anchor_tx_ref,
+                   created_at, receipt_json, result_json, payment_metadata_json
+            FROM local_verification_records
+            ORDER BY created_at DESC, record_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            d = dict(row)
+            # Extract safe metadata from serialized JSON
+            try:
+                receipt = _deserialize_receipt(row["receipt_json"])
+                d["schema_ref_and_version"] = receipt.schema_ref_and_version
+                d["signing_key_id"] = receipt.signing_key_id
+                d["signature_algorithm"] = receipt.signature_algorithm
+            except Exception:
+                d["schema_ref_and_version"] = None
+                d["signing_key_id"] = None
+                d["signature_algorithm"] = None
+
+            try:
+                result = _deserialize_result(row["result_json"])
+                d["validator_version"] = result.validator_version
+                if result.repair_info:
+                    d["repair_type"] = result.repair_info.repair_type.value
+                else:
+                    d["repair_type"] = None
+            except Exception:
+                d["validator_version"] = None
+                d["repair_type"] = None
+
+            try:
+                pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+                if pm:
+                    d["payment_status"] = pm.payment_status.value
+                    d["payment_facilitator"] = pm.facilitator
+                    d["settlement_network"] = pm.settlement_network
+                else:
+                    d["payment_status"] = None
+                    d["payment_facilitator"] = None
+                    d["settlement_network"] = None
+            except Exception:
+                d["payment_status"] = None
+                d["payment_facilitator"] = None
+                d["settlement_network"] = None
+
+            results.append(d)
+
+        return results
+
+    def get_by_record_id(self, record_id: str) -> Optional[dict]:
+        """
+        Retrieve a record by its record_id as a plain dict.
+
+        Args:
+            record_id: The LocalVerificationRecord.record_id (as string).
+
+        Returns:
+            Dict with safe metadata fields, or None if not found.
+        """
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM local_verification_records WHERE record_id = ?",
+            (record_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        d = dict(row)
+        try:
+            receipt = _deserialize_receipt(row["receipt_json"])
+            d["schema_ref_and_version"] = receipt.schema_ref_and_version
+            d["signing_key_id"] = receipt.signing_key_id
+            d["signature_algorithm"] = receipt.signature_algorithm
+        except Exception:
+            d["schema_ref_and_version"] = None
+            d["signing_key_id"] = None
+            d["signature_algorithm"] = None
+
+        try:
+            result = _deserialize_result(row["result_json"])
+            d["validator_version"] = result.validator_version
+            d["agent_identifier"] = None  # Not stored, derive from result
+            if result.repair_info:
+                d["repair_type"] = result.repair_info.repair_type.value
+            else:
+                d["repair_type"] = None
+        except Exception:
+            d["validator_version"] = None
+            d["repair_type"] = None
+
+        try:
+            pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+            if pm:
+                d["payment_status"] = pm.payment_status.value
+                d["payment_facilitator"] = pm.facilitator
+                d["settlement_network"] = pm.settlement_network
+            else:
+                d["payment_status"] = None
+                d["payment_facilitator"] = None
+                d["settlement_network"] = None
+        except Exception:
+            d["payment_status"] = None
+            d["payment_facilitator"] = None
+            d["settlement_network"] = None
+
+        return d
+
     def get_payment_metadata(
         self, record: LocalVerificationRecord
     ) -> Optional[PaymentMetadata]:

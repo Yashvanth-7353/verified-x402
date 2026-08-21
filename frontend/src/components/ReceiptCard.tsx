@@ -56,7 +56,7 @@ export function ReceiptCard({ receipt }: { receipt: VerificationReceipt }) {
       <div className="copy-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {signed ? (
-            <Pill tone="success">{receipt.signature_algorithm ?? 'Ed25519'} signature valid</Pill>
+            <Pill tone="accent">{receipt.signature_algorithm ?? 'Ed25519'} signed</Pill>
           ) : (
             <Pill tone="pending">Unsigned receipt</Pill>
           )}
@@ -71,7 +71,7 @@ export function ReceiptCard({ receipt }: { receipt: VerificationReceipt }) {
           state={{ receipt }}
           className="btn btn-ghost btn-sm"
         >
-          Verify independently
+          Verify signature
         </Link>
       </div>
 
