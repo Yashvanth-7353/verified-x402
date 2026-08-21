@@ -67,4 +67,6 @@ class VerificationReceipt(BaseModel):
     validator_version: str
     issued_at: datetime
     receipt_hash: str
-    signature: Optional[Any] = None
+    signature: Optional[str] = None  # Ed25519 signature (hex-encoded)
+    signature_algorithm: Optional[str] = None  # e.g. "Ed25519"
+    signing_key_id: Optional[str] = None  # Truncated SHA-256 of public key

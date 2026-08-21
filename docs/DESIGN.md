@@ -103,6 +103,6 @@ This is the concrete design realization of "No valid proof, no execution":
 | Sync vs. async handling of the escalated (paid) path | Blocking call vs. polling |
 | Retry policy for failed semantic-repair attempts | Free retry vs. new priced event |
 | Request replay / idempotency-key handling | Return cached receipt vs. reprocess |
-| Receipt signing mechanism | Whether/how local receipts are signed |
+| Receipt signing mechanism | **RESOLVED (Phase 12):** Ed25519 signing via dedicated key pair. `signature`, `signature_algorithm`, `signing_key_id` fields added to `VerificationReceipt`. receipt_hash excludes signature fields (preserves Merkle compatibility). Private key via `RECEIPT_SIGNING_PRIVATE_KEY` env var. Public key for independent verification. |
 
 These mirror and extend the TBDs listed in ARCHITECTURE.md §11 and DATA_MODEL.md §5, viewed from the design/interface angle.

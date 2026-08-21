@@ -64,6 +64,21 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Facilitator reports settlement failure (e.g., insufficient funds, per whatever Algorand testnet failure mode is used in testing) → confirm rejection, no semantic-repair call made.
 - Confirm `PaymentMetadata.payment_status` transitions are recorded accurately for each of the above (`pending` → `verified`/`settled`/`failed`).
 
+### Phase 8 payment metadata tests (implemented)
+
+- Settlement failure → 402 rejection, no handler invoked.
+- Settlement failure never invokes SemanticRepairEngine.
+- Successful settlement creates `PaymentMetadata` with `payment_status=settled`.
+- `PaymentMetadata.facilitator` = "GoPlausible AVM Facilitator".
+- `PaymentMetadata.settlement_network` = "Algorand".
+- `PaymentMetadata.algorand_tx_ref` reflects actual settlement transaction.
+- `PaymentMetadata.x402_challenge_ref` matches the request_id.
+- `RepairInfo.payment_ref` references `PaymentMetadata.payment_id`.
+- `verified_repaired` requires non-null `payment_ref` (Phase 8 invariant).
+- `verified_repaired` with semantic repair cannot occur without settled payment.
+- Failed payment cannot produce `verified_repaired`.
+- Deterministic repair (free path) has `payment_ref=None`.
+
 ## 7. Semantic-Repair Integration Test Scenarios
 
 - Successful escalation with a valid candidate fix returned → confirm the candidate is re-validated, not trusted directly.
@@ -85,8 +100,40 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Changing any bound field (output, schema ref/version, repair summary, validator version) changes `receipt_hash` — confirms tamper-evidence at the hashing level (Architecture Principle 7).
 - A receipt for a `verified_repaired` outcome has a non-null `repair_summary_hash` and a `payment_ref` with `payment_status = settled`; a receipt for a `verified` (non-repaired) outcome does not require a payment ref — confirms the DATA_MODEL.md §4 invariant.
 - Attempted tampering with a stored receipt (e.g., manually altering `outcome` in test fixtures) is detectable by recomputing and comparing `receipt_hash`.
+- `receipt_hash` determinism: the same logical receipt always produces the same hash.
+- `repair_summary_hash` is deterministic: the same `RepairInfo` always produces the same hash; a change to `RepairInfo` changes `repair_summary_hash`.
 
-## 10. Audit / Merkle Anchoring Test Scenarios
+### Phase 8 receipt tests (implemented)
+
+- Tamper outcome → hash changes.
+- Tamper output_hash → hash changes.
+- Tamper schema_ref_and_version → hash changes.
+- Tamper validator_version → hash changes.
+- output_hash matches FINAL payload (not pre-repair).
+- repair_summary_hash present for repaired, absent for verified.
+- No raw payload content in receipt.
+
+## 10. Local Verification Record Store Test Scenarios (Phase 9 — implemented)
+
+- Save a finalized record and retrieve by request_id — receipt_id, outcome, receipt_hash match.
+- Save a finalized record and retrieve by receipt_id — request_id, receipt_hash match.
+- receipt_hash is preserved exactly (not recalculated).
+- output_hash is preserved exactly.
+- All three outcomes (verified, verified_repaired, rejected) are persistable.
+- Semantic repaired record preserves payment_ref, payment_status=settled, algorand_tx_ref.
+- Duplicate save with same request_id + receipt_id is idempotent (no duplicate).
+- Duplicate save with same request_id but different receipt_id raises IntegrityError.
+- New records start as unanchored.
+- list_unanchored_records() returns new records with deterministic ordering.
+- mark_anchored() updates status and excludes from unanchored query.
+- Records survive database close/reopen (restart persistence).
+- Private keys, X-PAYMENT, recovery phrases, and raw payloads are never stored.
+- Nonexistent record queries return None.
+- Empty database returns empty list from list_unanchored_records().
+- Receipt and Result roundtrip correctly through serialization.
+- Multiple distinct records can be stored and retrieved.
+
+## 11. Audit / Merkle Anchoring Test Scenarios
 
 - Batch of N local records → confirm Merkle root is computed correctly and deterministically over their `receipt_hash` values.
 - Confirm the anchoring transaction submitted to Algorand contains only the Merkle root (and necessary transaction metadata) — explicitly assert no raw payload or unhashed receipt content appears in the transaction payload.
@@ -94,7 +141,42 @@ Given the hackathon timeline, prioritize integration/end-to-end coverage of the 
 - Simulate anchoring failure (network/Algorand unavailability) → confirm receipts already issued are unaffected, and confirm the record is retried/re-attempted rather than lost (ARCHITECTURE.md §10).
 - Confirm records not yet anchored are still correctly retrievable and their receipts remain valid/usable for execution gating even while `anchoring_status = unanchored` (DATA_MODEL.md §4 invariant).
 
-## 11. Privacy Test Scenarios
+### Phase 10 Merkle anchoring tests (implemented)
+
+**Merkle tree (18 tests):**
+- Empty tree returns None root.
+- Single leaf: root = leaf.
+- Two leaves: root = SHA256(A || B).
+- Three leaves: odd node doubled, root matches manual computation.
+- Four leaves: balanced tree.
+- Same inputs → same root (determinism).
+- Changed leaf → different root.
+- Changed order → different root.
+- Proof generation + verification for each leaf.
+- Proof fails with wrong root, wrong leaf, or wrong index.
+- Single leaf and odd-count tree proofs.
+
+**Anchoring service (21 tests):**
+- Empty batch → no_records_to_anchor, no Algorand call.
+- Batch selection: fewer/equal/more than batch size.
+- Only unanchored records selected.
+- Merkle root computed from batch.
+- Transaction ID stored from Algorand.
+- Merkle root sent to Algorand.
+- Submission failure → records remain unanchored.
+- Failed batch can be retried.
+- Successful batch not selected again.
+- No fake tx_ref on failure.
+- All records marked anchored after success.
+- Same merkle_root for entire batch.
+- Same anchor_tx_ref for entire batch.
+- Anchored records disappear from unanchored query.
+- Private key never in logs.
+- Raw payload never submitted.
+- X-PAYMENT never submitted.
+- Deterministic ordering → deterministic root.
+
+## 12. Privacy Test Scenarios
 
 - End-to-end trace of a full escalated request confirming that no unfiltered sensitive content appears in: the HTTP request sent to the semantic-repair API, any log output, the receipt, the local record's externally-shareable fields, or any Algorand transaction.
 - Negative test: a payload engineered to contain content matching a sensitive category is confirmed filtered even when it appears in a non-obvious location within the structured payload (e.g., nested field), to the extent the chosen filtering mechanism (Milestone 0 decision) claims to support.
@@ -113,7 +195,60 @@ For each of: facilitator unreachable, Algorand network unreachable, semantic-rep
 - Presented with a `verified` receipt but a *different* output than the one the receipt's `output_hash` covers → refuses (mismatch detection).
 - Presented with a malformed/tampered receipt (hash does not recompute correctly) → refuses.
 
-## 14. Out of Scope for MVP Testing
+## 14. Cryptographic Receipt Signing Test Scenarios (Phase 12)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Generate Ed25519 keypair | Valid 32-byte keypair |
+| 2 | Sign a valid receipt | Signature, algorithm, key_id populated |
+| 3 | Verify with correct public key | VALID |
+| 4 | Verify with wrong public key | INVALID |
+| 5 | Verify receipt with modified outcome | INVALID |
+| 6 | Verify receipt with modified output_hash | INVALID |
+| 7 | Verify receipt with modified request_id | INVALID |
+| 8 | Verify receipt with modified schema | INVALID |
+| 9 | Verify receipt with modified validator_version | INVALID |
+| 10 | Verify unsigned receipt | No signature (not invalid, just unsigned) |
+| 11 | Same receipt → same signature | Deterministic |
+| 12 | Different receipt → different signature | Collision-resistant |
+| 13 | receipt_hash excludes signature fields | Receipt hash unchanged by signing |
+| 14 | Signed receipt persisted in SQLite | Signature survives serialization roundtrip |
+| 15 | Private key never in receipt/API/logs | Security property |
+| 16 | Disabled signer produces unsigned receipt | Graceful degradation |
+| 17 | Real E2E: signed receipt after x402 payment | Signature present and valid |
+| 18 | Real E2E: signed receipt after Merkle anchoring | Signature preserved in anchored record |
+
+## 15. Independent Receipt Verification Test Scenarios (Phase 13)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Verify valid signed receipt with public key | VALID |
+| 2 | Verify with wrong public key | INVALID |
+| 3 | Verify receipt without signature | INVALID (no authenticity proof) |
+| 4 | Verify receipt with malformed signature hex | INVALID |
+| 5 | Verify receipt with modified request_id | INVALID |
+| 6 | Verify receipt with modified receipt_id | INVALID |
+| 7 | Verify receipt with modified outcome | INVALID |
+| 8 | Verify receipt with modified output_hash | INVALID |
+| 9 | Verify receipt with modified schema | INVALID |
+| 10 | Verify receipt with modified validator_version | INVALID |
+| 11 | Verify receipt with modified issued_at | INVALID |
+| 12 | Verify receipt with modified signature | INVALID |
+| 13 | Verify receipt with modified signing_key_id | Signature still valid (excluded from signable content) |
+| 14 | Verify receipt with modified receipt_hash | Hash invalid, signature still valid (excluded from signable content) |
+| 15 | Verify receipt without private key in environment | VALID (independent) |
+| 16 | Verify receipt without SQLite access | VALID (independent) |
+| 17 | Verify receipt without backend server | VALID (independent) |
+| 18 | Verify receipt after JSON roundtrip | VALID |
+| 19 | Verify receipt with extra field added | INVALID (changes canonical form) |
+| 20 | Verify receipt with optional field removed | INVALID (changes canonical form) |
+| 21 | CLI verifier: valid receipt | Exit 0, prints VALID |
+| 22 | CLI verifier: tampered receipt | Exit 1, prints INVALID |
+| 23 | GET /api/v1/receipt/public-key | Returns algorithm, key_id, public_key |
+| 24 | POST /api/v1/receipt/verify with valid receipt | valid=true |
+| 25 | POST /api/v1/receipt/verify with tampered receipt | valid=false |
+
+## 16. Out of Scope for MVP Testing
 
 Per PRD.md's MVP scope, the following are **not** required test coverage for the hackathon MVP (candidates for future scope):
 - Load/performance/throughput testing (no performance targets are defined in this document set — PRD.md §9).
