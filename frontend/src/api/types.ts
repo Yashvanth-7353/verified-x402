@@ -127,6 +127,7 @@ export interface AnchorResponse {
   leaf_count: number;
   merkle_root: string | null;
   transaction_id: string | null;
+  record_ids: string[];
   error: string | null;
 }
 

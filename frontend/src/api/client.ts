@@ -109,11 +109,18 @@ export function semanticRepair(
   });
 }
 
-export function triggerAnchor(batchSize?: number): Promise<AnchorResponse> {
+export function triggerAnchor(batchSize?: number, recordIds?: string[]): Promise<AnchorResponse> {
   return request('/api/v1/anchor', {
     method: 'POST',
-    body: JSON.stringify(batchSize ? { batch_size: batchSize } : {}),
+    body: JSON.stringify({
+      ...(batchSize ? { batch_size: batchSize } : {}),
+      ...(recordIds && recordIds.length > 0 ? { record_ids: recordIds } : {}),
+    }),
   });
+}
+
+export function listUnanchoredRecords(): Promise<RecordsListResponse> {
+  return request('/api/v1/records/unanchored');
 }
 
 export function verifyReceipt(receipt: VerificationReceipt): Promise<ReceiptVerifyResponse> {

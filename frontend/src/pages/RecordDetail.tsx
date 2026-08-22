@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getRecord } from '../api/client';
-import { ApiError, type RecordSummary } from '../api/types';
+import { getRecord, getMerkleProof } from '../api/client';
+import { ApiError, type MerkleProofResponse, type RecordSummary } from '../api/types';
 import { HashChip } from '../components/Copyable';
 import { EmptyState, ErrorBanner } from '../components/Feedback';
 import { OutcomeBadge, Pill } from '../components/StatusBadge';
@@ -27,6 +27,9 @@ export function RecordDetail() {
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [proof, setProof] = useState<MerkleProofResponse | null>(null);
+  const [proofLoading, setProofLoading] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!recordId) return;
@@ -48,6 +51,28 @@ export function RecordDetail() {
     load();
     return () => { cancelled = true; };
   }, [recordId]);
+
+  // Generate proof when record is anchored (must be before any early returns)
+  useEffect(() => {
+    if (!record || record.anchoring_status !== 'anchored' || !recordId) return;
+    let cancelled = false;
+    const loadProof = async () => {
+      setProofLoading(true);
+      setProofError(null);
+      try {
+        const p = await getMerkleProof(recordId);
+        if (!cancelled) setProof(p);
+      } catch (e) {
+        if (!cancelled) {
+          setProofError(e instanceof ApiError ? e.message : 'Failed to load proof.');
+        }
+      } finally {
+        if (!cancelled) setProofLoading(false);
+      }
+    };
+    loadProof();
+    return () => { cancelled = true; };
+  }, [record, recordId]);
 
   if (!recordId) {
     return (
@@ -245,6 +270,55 @@ export function RecordDetail() {
               </div>
             )}
           </div>
+
+          {/* Merkle inclusion proof (auto-loaded for anchored records) */}
+          {isAnchored && proofLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+              <span className="spinner spinner-dark" />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Generating inclusion proof…</span>
+            </div>
+          )}
+
+          {proofError && (
+            <p style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 10 }}>
+              {proofError}
+            </p>
+          )}
+
+          {proof && (
+            <div style={{
+              marginTop: 14,
+              padding: '12px 14px',
+              background: proof.verification.valid ? 'var(--success-bg)' : 'var(--danger-bg)',
+              border: `1px solid ${proof.verification.valid ? 'var(--success-border)' : 'var(--danger-border)'}`,
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 12.5,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ color: proof.verification.valid ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                  {proof.verification.valid ? '✓' : '✕'}
+                </span>
+                <span style={{ fontWeight: 600 }}>
+                  Merkle inclusion proof {proof.verification.valid ? 'valid' : 'INVALID'}
+                </span>
+                <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>
+                  ({proof.proof.length} nodes, leaf {proof.leaf_index} of {proof.batch_size})
+                </span>
+              </div>
+              <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+                {proof.verification.details}
+              </p>
+              <Link to="/anchoring" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}>
+                View full proof details
+              </Link>
+            </div>
+          )}
+
+          {!isAnchored && !proofLoading && !proof && (
+            <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginTop: 10 }}>
+              <Link to="/anchoring">Go to Anchoring</Link> to anchor this record.
+            </p>
+          )}
         </div>
 
         {/* Actions */}
@@ -252,10 +326,20 @@ export function RecordDetail() {
           <Link to="/verify-receipt" state={{ receipt: { receipt_id: record.receipt_id, request_id_ref: record.request_id, outcome: record.outcome, output_hash: record.output_hash || '', receipt_hash: record.receipt_hash } }} className="btn btn-ghost btn-sm">
             Verify receipt
           </Link>
-          {isAnchored && record.record_id && (
+          {!isAnchored && (
             <Link to="/anchoring" className="btn btn-ghost btn-sm">
-              View Merkle proof
+              Anchor this record
             </Link>
+          )}
+          {isAnchored && record.anchor_tx_ref && (
+            <a
+              className="btn btn-ghost btn-sm"
+              href={algorandExplorerUrl(record.anchor_tx_ref)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on Algorand →
+            </a>
           )}
         </div>
       </div>

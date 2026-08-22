@@ -128,6 +128,33 @@ def list_records(offset: int = 0, limit: int = 50) -> RecordsListResponse:
 
 
 @router.get(
+    "/records/unanchored",
+    response_model=RecordsListResponse,
+    summary="List unanchored verification records",
+    description=(
+        "Returns verification records that have not yet been anchored to Algorand. "
+        "These are candidates for Merkle anchoring."
+    ),
+)
+def list_unanchored_records() -> RecordsListResponse:
+    """List records eligible for Merkle anchoring."""
+    try:
+        store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
+        # Get all records and filter client-side (simple and correct)
+        all_records = store.list_records(offset=0, limit=1000)
+        unanchored = [r for r in all_records if r.get("anchoring_status") == "unanchored"]
+        return RecordsListResponse(
+            records=[_record_to_summary(r) for r in unanchored],
+            total=len(unanchored),
+            offset=0,
+            limit=len(unanchored),
+        )
+    except Exception as e:
+        logger.exception("Failed to list unanchored records")
+        raise HTTPException(status_code=500, detail="Failed to retrieve unanchored records")
+
+
+@router.get(
     "/records/{record_id}",
     response_model=RecordDetail,
     summary="Get a specific verification record",
