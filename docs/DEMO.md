@@ -209,7 +209,47 @@ proof = generate_proof(tree, leaf_index)
 valid = verify_proof(leaves[leaf_index], proof, tree.root, leaf_index)
 ```
 
-## 15. Troubleshooting
+## 15. Groq LLM Semantic Repair (Phase 15)
+
+The semantic repair provider now supports real Groq LLM-based repair.
+
+### Configuration
+
+Add to `.env`:
+```bash
+SEMANTIC_REPAIR_PROVIDER=groq
+GROQ_API_KEY=gsk_YOUR_KEY_HERE
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_TIMEOUT_SECONDS=30
+```
+
+### How it works
+
+1. Validation determines a blocking finding that cannot be fixed deterministically.
+2. Backend returns HTTP 402 (x402 payment required).
+3. Client pays via GoPlausible facilitator.
+4. Backend sends the payload, schema, and findings to Groq.
+5. Groq returns a candidate repaired JSON object.
+6. The candidate is re-validated by the same `VerificationEngine`.
+7. If re-validation passes → `verified_repaired`.
+8. If re-validation fails → `rejected`.
+
+The LLM is NEVER trusted directly. Its output is always a candidate that must pass re-validation.
+
+### Provider in demo output
+
+The real demo now shows:
+```
+Repair type: semantic
+Provider: GroqSemanticProvider
+```
+
+### Provider selection
+
+- `SEMANTIC_REPAIR_PROVIDER=groq` + valid `GROQ_API_KEY` → `GroqSemanticProvider`
+- Otherwise → `MockSemanticProvider` (for testing/offline)
+
+## 16. Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
@@ -234,4 +274,4 @@ python -m pytest tests/api/ -v         # API endpoint tests
 python -m pytest tests/demo/ -v        # Phase 11 failure path tests
 ```
 
-All 166+ tests pass offline without real Algorand credentials.
+All 258 tests pass offline without real Algorand credentials.

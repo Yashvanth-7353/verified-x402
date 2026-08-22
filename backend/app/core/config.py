@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"  # Comma-separated allowed origins
     MAX_REQUEST_BYTES: int = 1_048_576  # 1 MB max request body
 
+    # Phase 15: Groq LLM Semantic Repair
+    SEMANTIC_REPAIR_PROVIDER: str = "groq"  # "groq" or "mock"
+    GROQ_API_KEY: str = ""  # Groq API key (starts with gsk_)
+    GROQ_MODEL: str = "openai/gpt-oss-20b"  # Groq model for semantic repair
+    GROQ_TIMEOUT_SECONDS: float = 30.0  # Timeout for Groq API calls
+
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
     @property

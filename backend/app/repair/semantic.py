@@ -23,9 +23,30 @@ class MockSemanticProvider:
             return repaired
         return None
 
+def get_default_provider() -> SemanticRepairProvider:
+    """Return the configured semantic repair provider.
+    
+    Uses GroqSemanticProvider when SEMANTIC_REPAIR_PROVIDER=groq and GROQ_API_KEY is set.
+    Falls back to MockSemanticProvider for testing, offline demo, or when Groq is not configured.
+    """
+    from app.core.config import settings
+    
+    if settings.SEMANTIC_REPAIR_PROVIDER == "groq" and settings.GROQ_API_KEY:
+        try:
+            from app.repair.groq_provider import GroqSemanticProvider
+            return GroqSemanticProvider()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to initialize GroqSemanticProvider (%s); falling back to MockSemanticProvider", e
+            )
+            return MockSemanticProvider()
+    return MockSemanticProvider()
+
+
 class SemanticRepairEngine:
     def __init__(self, provider: SemanticRepairProvider = None):
-        self.provider = provider or MockSemanticProvider()
+        self.provider = provider or get_default_provider()
 
     def attempt_repair(self, request: VerificationRequest, policy: SchemaPolicy, findings: List[ValidationFinding]) -> Tuple[dict, Optional[RepairInfo]]:
         """

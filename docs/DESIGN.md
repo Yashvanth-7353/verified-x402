@@ -104,5 +104,6 @@ This is the concrete design realization of "No valid proof, no execution":
 | Retry policy for failed semantic-repair attempts | Free retry vs. new priced event |
 | Request replay / idempotency-key handling | Return cached receipt vs. reprocess |
 | Receipt signing mechanism | **RESOLVED (Phase 12):** Ed25519 signing via dedicated key pair. `signature`, `signature_algorithm`, `signing_key_id` fields added to `VerificationReceipt`. receipt_hash excludes signature fields (preserves Merkle compatibility). Private key via `RECEIPT_SIGNING_PRIVATE_KEY` env var. Public key for independent verification. |
+| Semantic-repair provider | **RESOLVED (Phase 15):** `GroqSemanticProvider` using Groq API (`openai/gpt-oss-20b`). Structured JSON output via `response_format={"type": "json_object"}`. Prompt injection defenses (system/user message separation, untrusted data as data only). Data minimization (only payload, schema, findings sent). Fail-closed error handling. `MockSemanticProvider` retained for tests/offline. Provider selected via `SEMANTIC_REPAIR_PROVIDER` env var. LLM candidate always re-validated by `VerificationEngine` — never trusted directly. |
 
 These mirror and extend the TBDs listed in ARCHITECTURE.md §11 and DATA_MODEL.md §5, viewed from the design/interface angle.

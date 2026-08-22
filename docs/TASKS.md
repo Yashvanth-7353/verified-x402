@@ -176,7 +176,29 @@ Depends on: All previous milestones.
 - [x] Full test suite: 234 passed, 0 failed.
 - [x] Real E2E: x402 payment → semantic repair → receipt → SQLite → Merkle → Algorand anchor.
 
-## 15. Optional / Future Scope Tasks (Explicitly Not MVP)
+## 15. Milestone 13 — Real Groq LLM Semantic Repair ✅ Phase 15 complete
+
+Depends on: Milestone 4 (semantic repair API), Milestone 12 (backend hardening).
+
+- [x] Installed Groq Python SDK (`groq>=1.0.0`).
+- [x] Added `SEMANTIC_REPAIR_PROVIDER`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_TIMEOUT_SECONDS` to config.
+- [x] Created `GroqSemanticProvider` in `app/repair/groq_provider.py`.
+- [x] Provider conforms to `SemanticRepairProvider` protocol (same interface as `MockSemanticProvider`).
+- [x] Structured JSON output via `response_format={"type": "json_object"}`.
+- [x] Prompt injection defenses: system prompt separation, untrusted data treated as data only.
+- [x] Data minimization: only sends payload, schema, and findings — no private keys or infrastructure data.
+- [x] Fail-closed error handling: timeout, auth, rate limit, malformed JSON, unexpected errors.
+- [x] `get_default_provider()` factory returns `GroqSemanticProvider` when configured, else `MockSemanticProvider`.
+- [x] `MockSemanticProvider` retained for unit tests and offline demo.
+- [x] `tests/conftest.py` autouse fixture forces `MockSemanticProvider` during all unit tests.
+- [x] Real Groq integration test passed: model adds missing `age` field, passes re-validation.
+- [x] Real E2E demo: x402 payment → Groq semantic repair → verified_repaired → receipt → Merkle → Algorand anchor.
+- [x] 24 new tests (provider interface, error handling, security, integration, user message).
+- [x] Full test suite: 258 passed, 0 failed.
+- [x] Provider metadata propagated: `semantic_repair_provider_ref="GroqSemanticProvider"` in `RepairInfo`.
+- [x] Frontend `RepairCompare.tsx` correctly displays provider name from backend response.
+
+## 16. Optional / Future Scope Tasks (Explicitly Not MVP)
 
 - [ ] Multi-agent/multi-tenant policy isolation (PRD.md §11).
 - [ ] Semantic-repair provider marketplace / multiple providers (PRD.md §11).

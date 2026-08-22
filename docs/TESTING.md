@@ -248,7 +248,51 @@ For each of: facilitator unreachable, Algorand network unreachable, semantic-rep
 | 24 | POST /api/v1/receipt/verify with valid receipt | valid=true |
 | 25 | POST /api/v1/receipt/verify with tampered receipt | valid=false |
 
-## 16. Out of Scope for MVP Testing
+## 16. Groq LLM Semantic Repair Test Scenarios (Phase 15)
+
+### Unit Tests (Mocked — no real Groq API calls)
+
+| # | Test | Expected |
+|---|------|----------|
+| 1 | Valid Groq structured response | Returns repaired dict |
+| 2 | Non-blocking findings only | Returns None (no repair needed) |
+| 3 | Empty findings | Returns None |
+| 4 | Non-dict response (list, string, number) | Returns None (rejected) |
+| 5 | Empty choices in response | Returns None |
+| 6 | Empty message content | Returns None |
+| 7 | None message content | Returns None |
+| 8 | Groq timeout | Returns None (fail closed) |
+| 9 | Groq rate limit (429) | Returns None (fail closed) |
+| 10 | Groq auth error (401) | Returns None (fail closed) |
+| 11 | Invalid JSON response | Returns None (fail closed) |
+| 12 | Unexpected exception | Returns None (fail closed) |
+| 13 | Init without GROQ_API_KEY | Raises ValueError |
+| 14 | Prompt injection in payload | Payload treated as data only, injection ignored |
+| 15 | No infrastructure secrets in user message | PAYER_PRIVATE_KEY etc. never sent |
+| 16 | System prompt contains injection defense | "DATA ONLY" and "UNTRUSTED" present |
+| 17 | Engine integration with Groq provider | RepairInfo with provider_ref="GroqSemanticProvider" |
+| 18 | Groq candidate rejected by re-validation | Re-validation finds blocking issues |
+| 19 | MockSemanticProvider still works | Existing mock tests pass |
+| 20 | Repair hash determinism | Same input → same pre/post repair hashes |
+| 21 | Only blocking findings in user message | Info findings excluded |
+| 22 | Schema included in user message | Schema present in message |
+| 23 | Payload included in user message | Original output present |
+| 24 | No infrastructure secrets in message | Secret patterns absent |
+
+### Real Integration Test (requires GROQ_API_KEY)
+
+| # | Test | Expected |
+|---|------|----------|
+| 1 | Missing required field → Groq repair | Model adds field, passes re-validation |
+| 2 | Real E2E demo with Groq | x402 → Groq → verified_repaired → receipt → Merkle → Algorand |
+
+### Provider Selection
+
+- Unit tests: `MockSemanticProvider` enforced via `tests/conftest.py` autouse fixture.
+- Real E2E: `GroqSemanticProvider` used when `SEMANTIC_REPAIR_PROVIDER=groq` and `GROQ_API_KEY` set.
+- Offline demo: `MockSemanticProvider` (explicitly offline).
+
+## 17. Out of Scope for MVP Testing
 
 Per PRD.md's MVP scope, the following are **not** required test coverage for the hackathon MVP (candidates for future scope):
 - Load/performance/throughput testing (no performance targets are defined in this document set — PRD.md §9).

@@ -186,7 +186,7 @@ Escalation Decision
 | **x402 Middleware** | `main.py` | Intercepts requests to `/semantic-repair`, verifies USDC payment via GoPlausible, settles on Algorand, stores settlement info on `request.state` BEFORE calling the handler |
 | **Verification Engine** | `validation/engine.py` | Runs schema, type, syntax, SQL safety, and privacy validation stages in sequence |
 | **Deterministic Repair** | `repair/deterministic.py` | Applies rule-based fixes (e.g., filling defaults) |
-| **Semantic Repair** | `repair/semantic.py` | Sends privacy-filtered payload to `MockSemanticProvider` for AI-based repair |
+| **Semantic Repair** | `repair/semantic.py` | Sends privacy-filtered payload to `GroqSemanticProvider` (or `MockSemanticProvider` in tests) for AI-based repair |
 | **Receipt Service** | `evidence/receipt.py` | Generates signed `VerificationReceipt` with deterministic `receipt_hash` |
 | **Ed25519 Signing** | `crypto/signing.py` | Signs receipts using dedicated key pair |
 | **Receipt Verifier** | `crypto/verify.py` | Verifies receipts independently (public-key-only) |
@@ -438,7 +438,7 @@ verified_repaired / rejected
 
 #### MVP provider
 
-The current MVP uses `MockSemanticProvider` as the semantic-repair provider.
+The production system uses `GroqSemanticProvider` (Groq API, `openai/gpt-oss-20b`). `MockSemanticProvider` is used for tests and offline demo only.
 
 This is an intentional application-level architecture decision. It is not a mock of:
 
@@ -761,15 +761,19 @@ CREATE INDEX idx_lvr_created_at ON local_verification_records(created_at);
 - In-process TestClient with real x402 payment
 - Real GoPlausible facilitator verification
 - Real Algorand TestNet USDC settlement
-- Real semantic repair (MockSemanticProvider)
+- Real semantic repair (GroqSemanticProvider via Groq API)
 - Real receipt signing
 - Real SQLite persistence
 - Real Merkle anchoring to Algorand TestNet
 - Real on-chain verification readback
 
-### MockSemanticProvider — Intentional MVP Architecture
+### Semantic Repair Provider (Phase 15)
 
-The semantic repair provider (`MockSemanticProvider`) is an **intentional part of the project's MVP architecture**. It is NOT a fake payment or fake blockchain implementation. The project's data model specifies `MockSemanticProvider` as the semantic repair provider for the demo. The x402 payment, GoPlausible facilitator, Algorand settlement, and Merkle anchoring are all REAL.
+The production semantic repair provider is `GroqSemanticProvider`, which calls the Groq API (`openai/gpt-oss-20b`) with structured JSON output. The LLM candidate is always re-validated by `VerificationEngine` — never trusted directly.
+
+`MockSemanticProvider` is retained for unit tests and offline demo mode only. Tests use `MockSemanticProvider` enforced via `tests/conftest.py` autouse fixture.
+
+The x402 payment, GoPlausible facilitator, Algorand settlement, and Merkle anchoring are all REAL.
 
 ### 13-Step Demo Flow
 
@@ -1514,10 +1518,10 @@ result = ReceiptVerifier(pub).verify(tampered)
 | **Receipt signing (Ed25519)** | ✅ Real | Never mocked | Pure local cryptography |
 | **Receipt verification** | ✅ Real | Never mocked | Pure local cryptography |
 | **SQLite persistence** | ✅ Real | Test DBs in tests | Local database |
-| **Semantic repair** | MockSemanticProvider | N/A | **Intentional MVP architecture** |
+| **Semantic repair** | ✅ Real (GroqSemanticProvider) | MockSemanticProvider in tests/offline | Groq API with re-validation |
 | **Local validation** | ✅ Real | Never mocked | Core local pipeline |
 
-**Important**: `MockSemanticProvider` is the project's intentional MVP semantic repair implementation. It is NOT a mock of x402, Algorand, or payment infrastructure. The payment, settlement, and anchoring are all real.
+**Important**: Production uses `GroqSemanticProvider` (Groq API). `MockSemanticProvider` is used only in unit tests (enforced by conftest.py) and offline demo. The x402 payment, GoPlausible facilitator, Algorand settlement, and Merkle anchoring are all real.
 
 ---
 
