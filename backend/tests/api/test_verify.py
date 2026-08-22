@@ -88,11 +88,15 @@ class TestVerifyEndpointRepair:
         assert data["result"]["repair_info"]["repair_type"] == "deterministic"
         assert data["receipt"]["repair_summary_hash"] is not None
 
-    def test_semantic_repairable_request(self, client):
+    def test_semantic_repair_escalation_required(self, client):
+        """When /verify finds blocking findings that deterministic repair
+        cannot fix, it must return rejected (not verified_repaired).
+        Semantic repair is only available via the payment-gated
+        /semantic-repair endpoint — never inline during /verify.
+        """
         body = _make_payload(
             output_payload={
                 "name": "Bob",
-                "inject_mock_semantic_repair": {"age": 25}
             },
             schema_definition={
                 "type": "object",
@@ -106,10 +110,13 @@ class TestVerifyEndpointRepair:
         resp = client.post("/api/v1/verify", json=body)
         assert resp.status_code == 200
         data = resp.json()
-        assert data["result"]["outcome"] == "verified_repaired"
-        assert data["result"]["repair_info"] is not None
-        assert data["result"]["repair_info"]["repair_type"] == "semantic"
-        assert data["receipt"]["repair_summary_hash"] is not None
+        assert data["result"]["outcome"] == "rejected"
+        assert data["result"]["repair_info"] is None
+        # Blocking finding for missing 'age'
+        blocking = [f for f in data["result"]["findings"] if f["severity"] == "blocking"]
+        assert len(blocking) >= 1
+        assert any("age" in f["description"].lower() for f in blocking)
+        assert data["receipt"]["repair_summary_hash"] is None
 
 
 class TestVerifyEndpointRejection:

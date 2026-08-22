@@ -263,7 +263,7 @@ export function Result() {
                 <h3 style={{ fontSize: 16, marginBottom: 4 }}>Local repair couldn't resolve this</h3>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                   Escalate to semantic repair — this triggers a payment-gated endpoint. A settled x402
-                  payment (1 USDC on Algorand TestNet) is required before any repair is attempted.
+                  payment (0.01 USDC on Algorand TestNet) is required before any repair is attempted.
                 </p>
               </div>
               <button type="button" className="btn btn-accent" onClick={onEscalate} disabled={escalating}>
