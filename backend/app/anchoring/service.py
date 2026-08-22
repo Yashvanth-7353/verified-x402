@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, Protocol
 
-from app.anchoring.merkle import compute_root, build_merkle_tree, MerkleTree
+from app.anchoring.merkle import compute_root, build_merkle_tree, MerkleTree, is_valid_receipt_hash
 from app.storage.store import LocalVerificationRecordStore, LocalVerificationRecord
 
 logger = logging.getLogger(__name__)
@@ -207,6 +207,19 @@ class MerkleAnchoringService:
             batch = [r for r in all_unanchored if str(r.record_id) in id_set]
         else:
             batch = all_unanchored[: self._batch_size]
+
+        # Validate receipt hashes — reject batch if any are invalid
+        invalid = [r for r in batch if not is_valid_receipt_hash(r.receipt_hash)]
+        if invalid:
+            invalid_ids = [str(r.record_id) for r in invalid]
+            logger.error(
+                "Anchor batch contains %d records with invalid receipt hashes: %s",
+                len(invalid), invalid_ids[:5],
+            )
+            return AnchorResult(
+                status="failed",
+                error=f"{len(invalid)} record(s) have invalid receipt hashes and cannot be anchored: {', '.join(invalid_ids[:5])}",
+            )
 
         if not batch:
             logger.info("No unanchored records to anchor")
