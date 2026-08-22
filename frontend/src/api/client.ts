@@ -6,6 +6,7 @@ import {
   type PaymentRequiredChallenge,
   type PublicKeyResponse,
   type ReceiptVerifyResponse,
+  type RecordSummary,
   type RecordsListResponse,
   type SchemaPolicy,
   type SemanticRepairResponse,

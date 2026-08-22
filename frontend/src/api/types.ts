@@ -186,7 +186,6 @@ export interface RecordSummary {
   validator_version?: string | null;
   signing_key_id?: string | null;
   signature_algorithm?: string | null;
-  repair_type?: string | null;
   payment_facilitator?: string | null;
   settlement_network?: string | null;
 }

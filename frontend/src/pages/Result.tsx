@@ -22,6 +22,7 @@ import { VerificationSeal } from '../components/VerificationSeal';
 import { formatDateTime, formatAtomicAmount, algorandExplorerUrl } from '../lib/format';
 import { appendSessionEntry } from '../lib/session';
 import { createWalletAvmSigner, createSignedPayment } from '../lib/x402Payment';
+import type { PaymentRequired } from '@x402/core/types';
 
 interface LocationState {
   request: VerificationRequest;
@@ -187,13 +188,15 @@ export function Result() {
       const paymentReq = challenge.accepts?.[0];
       if (!paymentReq) throw new Error('No payment requirements in 402 response');
 
-      // 2. Build the full PaymentRequired structure for the x402 client
+      // 2. Build the full PaymentRequired structure for the x402 client.
+      // Cast: our PaymentRequiredChallenge mirrors the live server's actual
+      // (looser) shape, not the SDK's stricter CAIP-2-typed `network` field.
       const paymentRequired = {
         x402Version: challenge.x402Version,
         accepts: challenge.accepts,
         resource: challenge.resource,
         error: challenge.error,
-      };
+      } as unknown as PaymentRequired;
 
       // 3. Create a ClientAvmSigner adapter from the wallet
       const walletSigner = createWalletAvmSigner(activeAddress, signTransactions);
@@ -348,7 +351,7 @@ export function Result() {
           {escalationError && <ErrorBanner title="Escalation failed" message={escalationError} />}
 
           {/* Wallet payment flow */}
-          {showPaymentFlow && (
+          {showPaymentFlow && challenge && (
             <div className="card card-pad" style={{ borderColor: 'var(--seal-border)', background: 'var(--seal-bg)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <h3 style={{ fontSize: 18 }}>Payment required</h3>

@@ -11,8 +11,8 @@
 import { x402Client } from '@x402/core/client';
 import { ExactAvmScheme } from '@x402/avm/exact/client';
 
-import type { ClientAvmSigner } from '@x402/avm/exact/client';
-import type { PaymentRequired } from '@x402/core';
+import type { ClientAvmSigner } from '@x402/avm';
+import type { PaymentRequired } from '@x402/core/types';
 
 /**
  * Create a ClientAvmSigner from the useWallet hook's signTransactions function.
