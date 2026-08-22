@@ -13,6 +13,7 @@ import { History } from './pages/History';
 import { ReceiptVerify } from './pages/ReceiptVerify';
 import { Anchoring } from './pages/Anchoring';
 import { About } from './pages/About';
+import { RecordDetail } from './pages/RecordDetail';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -38,6 +39,7 @@ function AppShell() {
             <Route path="/history" element={<History />} />
             <Route path="/verify-receipt" element={<ReceiptVerify />} />
             <Route path="/anchoring" element={<Anchoring />} />
+            <Route path="/record/:recordId" element={<RecordDetail />} />
             <Route path="/about" element={<About />} />
             <Route path="*" element={<Home />} />
           </Routes>

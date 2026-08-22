@@ -6,10 +6,10 @@
  * - "clean": passes schema validation as-is → verified.
  * - "defaulted": omits a field the schema declares a `default` for → the
  *   deterministic repair engine fills it in (schema_defaults rule) → verified_repaired.
- * - "needsRepair": omits a required field with no schema default, and — because
- *   the semantic-repair endpoint's MockSemanticProvider (the MVP provider) looks
- *   for an `inject_mock_semantic_repair` key — is only fixable through the
- *   payment-gated /semantic-repair escalation.
+ * - "needsRepair": omits a required field with no schema default — deterministic
+ *   repair can't help. Escalation to /semantic-repair triggers x402 payment,
+ *   then GroqSemanticProvider (production) or MockSemanticProvider (tests)
+ *   generates a candidate repair, which is re-validated.
  */
 
 export interface Example {

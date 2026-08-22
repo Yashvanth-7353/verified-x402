@@ -71,6 +71,10 @@ export function History() {
     navigate('/verify-receipt', { state: { receipt } });
   };
 
+  const navigateToRecord = (recordId: string) => {
+    navigate(`/record/${recordId}`);
+  };
+
   return (
     <div className="page">
       <div className="container">
@@ -196,7 +200,8 @@ export function History() {
                       {filteredServer.map((r) => (
                         <tr
                           key={r.record_id}
-                          style={{ borderBottom: '1px solid var(--border)' }}
+                          style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                          onClick={() => navigateToRecord(r.record_id)}
                         >
                           <td style={{ padding: '12px 16px' }}>
                             <OutcomeBadge outcome={r.outcome} />

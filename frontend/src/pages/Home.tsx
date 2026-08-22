@@ -37,6 +37,25 @@ const FEATURES = [
   },
 ];
 
+const USE_CASES = [
+  { icon: '⚡', title: 'AI Financial Agent', body: 'Validates payment instructions before execution.' },
+  { icon: '📦', title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.' },
+  { icon: '🔗', title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.' },
+  { icon: '🔌', title: 'AI API Execution', body: 'Validates API requests before they are sent.' },
+  { icon: '📋', title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.' },
+];
+
+const TECH = [
+  { label: 'FastAPI', desc: 'Backend API' },
+  { label: 'SQLite', desc: 'Local persistence' },
+  { label: 'Groq', desc: 'Semantic repair' },
+  { label: 'x402', desc: 'Payment protocol' },
+  { label: 'GoPlausible', desc: 'Payment facilitator' },
+  { label: 'Ed25519', desc: 'Receipt signing' },
+  { label: 'SHA-256', desc: 'Hashing' },
+  { label: 'Merkle Tree', desc: 'Batch commitment' },
+  { label: 'Algorand', desc: 'TestNet anchor' },
+];
 
 function FeatureVisual({ kind }: { kind: string }) {
   const { nodeRef, onMouseMove, onMouseLeave } = useTilt<HTMLDivElement>(6);
@@ -145,15 +164,12 @@ export function Home() {
               speed={26}
               className="hero-title"
               segments={[
-                { text: 'A ' },
-                { text: 'notary', className: 'display-italic' },
-                { text: ' for what your agent just said it did.' },
+                { text: 'Verify what AI produces.' },
               ]}
             />
             <p style={{ fontSize: 'var(--fs-md)', color: 'var(--text-muted)', maxWidth: 540, marginTop: 16 }}>
-              Verified sits between an AI agent's structured output and whatever executes it. It validates, repairs,
-              re-validates, and issues a signed, tamper-evident receipt — anchored to Algorand — before anything
-              downstream is allowed to trust the result.
+              A local-first verification layer that validates, repairs, re-validates, signs, persists, and anchors
+              AI-generated outputs — so downstream systems never have to trust blindly.
             </p>
             <div style={{ marginTop: 12, minHeight: 24, fontSize: 'var(--fs-sm)', color: 'var(--text-faint)' }}>
               <Typewriter
@@ -202,9 +218,7 @@ export function Home() {
         </div>
       </section>
 
-
-
-      {/* ---------- Feature rows (varied, alternating layout) ---------- */}
+      {/* ---------- Feature rows ---------- */}
       <section className="container">
         <div className="feature-timeline">
           {FEATURES.map((f, i) => (
@@ -269,7 +283,42 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---------- New CTA Section ---------- */}
+      {/* ---------- Technology stack ---------- */}
+      <section className="container" style={{ marginBottom: 56 }}>
+        <Reveal>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Built with</div>
+        </Reveal>
+        <div className="snap-strip">
+          {TECH.map((t, i) => (
+            <Reveal key={t.label} delay={i * 50}>
+              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--grotesk)' }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>{t.desc}</div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ---------- Use cases ---------- */}
+      <section className="container" style={{ marginBottom: 56 }}>
+        <Reveal>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Use cases</div>
+        </Reveal>
+        <div className="bento">
+          {USE_CASES.map((uc, i) => (
+            <Reveal key={uc.title} delay={i * 60}>
+              <div className="span-4 card card-pad">
+                <div style={{ fontSize: 24, marginBottom: 6 }}>{uc.icon}</div>
+                <h3 style={{ fontSize: 15, marginBottom: 4 }}>{uc.title}</h3>
+                <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{uc.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ---------- CTA ---------- */}
       <section className="container">
         <Reveal>
           <div className="cta-section">
@@ -290,6 +339,7 @@ export function Home() {
         </Reveal>
       </section>
 
+      {/* ---------- Session log ---------- */}
       {log.length > 0 && (
         <section className="container" style={{ marginBottom: 56 }}>
           <Reveal>

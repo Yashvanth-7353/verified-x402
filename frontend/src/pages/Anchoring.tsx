@@ -121,7 +121,7 @@ export function Anchoring() {
           <div style={{ marginTop: 16 }}>
             <ErrorBanner
               title="Anchoring not configured"
-              message="This backend doesn't have ANCHOR_PRIVATE_KEY set, so it can't submit Algorand transactions. This is a backend deployment setting, not something the frontend can fix."
+              message="This backend doesn't have an Algorand anchor account configured, so it can't submit anchor transactions. This is a backend deployment setting — check that the ANCHOR_PRIVATE_KEY environment variable is set."
             />
           </div>
         )}

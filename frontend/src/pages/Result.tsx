@@ -55,7 +55,6 @@ export function Result() {
       result: response.result,
       receipt: response.receipt,
     });
-    // Log once per response identity, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response?.receipt.receipt_id]);
 
@@ -85,7 +84,11 @@ export function Result() {
                   ? 'active'
                   : 'skipped',
       },
-      { key: 'repaired', label: 'Repaired', state: hasRepair ? 'done' : 'skipped' },
+      {
+        key: 'repaired',
+        label: 'Repaired',
+        state: hasRepair ? 'done' : 'skipped',
+      },
       { key: 'revalidated', label: 'Re-validated', state: hasRepair ? 'done' : 'skipped' },
       { key: 'receipt', label: 'Receipt', state: response.result.outcome === 'rejected' ? 'failed' : 'done' },
     ];
@@ -147,6 +150,9 @@ export function Result() {
 
   const canEscalate = response.result.outcome === 'rejected' && !escalated;
 
+  // Determine the semantic repair provider from repair_info
+  const semanticProvider = response.result.repair_info?.semantic_repair_provider_ref;
+
   return (
     <div className="page">
       <div className="container" style={{ maxWidth: 880 }}>
@@ -182,6 +188,16 @@ export function Result() {
             <div className="card card-pad">
               <div className="section-title">Repair</div>
               <RepairCompare repairInfo={response.result.repair_info} before={request.output_payload} />
+              {semanticProvider && (
+                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="badge badge-accent">
+                    Provider: {semanticProvider}
+                  </span>
+                  {semanticProvider.includes('Groq') && (
+                    <span className="badge badge-pending">Model: openai/gpt-oss-20b</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -190,8 +206,8 @@ export function Result() {
               <div>
                 <h3 style={{ fontSize: 16, marginBottom: 4 }}>Local repair couldn't resolve this</h3>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  Escalate to semantic repair — this calls the payment-gated endpoint and will require a settled x402
-                  payment before any repair is attempted.
+                  Escalate to semantic repair — this triggers a payment-gated endpoint. A settled x402
+                  payment (1 USDC on Algorand TestNet) is required before any repair is attempted.
                 </p>
               </div>
               <button type="button" className="btn btn-accent" onClick={onEscalate} disabled={escalating}>
@@ -206,12 +222,21 @@ export function Result() {
           {challenge && !paymentMeta && (
             <div>
               <PaymentRequiredCard challenge={challenge} />
-              <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginTop: 10 }}>
-                Browser-side wallet signing isn't part of the current API contract — Verified's backend never receives
-                or handles a private key from this UI. Settlement for this demo is completed via the backend's x402
-                client (see <code className="mono">backend/scripts/e2e_client.py</code>); once settled, refreshing this
-                escalation will show the paid, repaired result below.
-              </p>
+              <div className="card card-pad" style={{ marginTop: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
+                <strong>Why can't I pay from the browser?</strong>
+                <p style={{ marginTop: 6 }}>
+                  Verified uses the x402 protocol, which requires constructing and signing an Algorand
+                  USDC transaction. The current architecture completes payment settlement through the
+                  backend's x402 client (<code className="mono">backend/scripts/e2e_client.py</code>),
+                  which holds the payer's private key server-side. The frontend never receives or handles
+                  private keys — this is by design.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  To complete the payment, run the backend's E2E client script, then re-trigger this
+                  escalation. The paid result will show the settled payment metadata, repaired output,
+                  and signed receipt.
+                </p>
+              </div>
             </div>
           )}
 
