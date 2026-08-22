@@ -240,10 +240,11 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
             repaired_output=repaired_output,
         )
 
-        # Phase 9: Persist the finalized record
+        # Phase 9: Persist the finalized record (upsert replaces the
+        # intermediate rejected record from /verify with the final state)
         try:
             store = _get_record_store()
-            store.save(
+            store.upsert(
                 result=final_result,
                 receipt=receipt,
                 payment_metadata=payment_metadata,
