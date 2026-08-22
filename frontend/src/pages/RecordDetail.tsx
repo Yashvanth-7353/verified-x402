@@ -19,13 +19,8 @@ type RecordDetail = RecordSummary & {
   settlement_network?: string | null;
 };
 
-const TIMELINE_STEPS = [
-  { key: 'record', label: 'Record created' },
-  { key: 'outcome', label: 'Verification outcome' },
-  { key: 'repair', label: 'Repair type' },
-  { key: 'payment', label: 'Payment status' },
-  { key: 'anchor', label: 'Anchoring status' },
-];
+// Timeline steps are built dynamically from the actual backend record data.
+// Only steps with real information are shown — no placeholder values.
 
 export function RecordDetail() {
   const { recordId } = useParams<{ recordId: string }>();
@@ -88,10 +83,20 @@ export function RecordDetail() {
     );
   }
 
-  // All data comes directly from the backend — no frontend inference
-  const hasRepair = record.repair_type != null && record.repair_type !== 'none';
-  const hasPayment = record.payment_status != null && record.payment_status !== 'none';
   const isAnchored = record.anchoring_status === 'anchored';
+
+  // Build timeline from actual backend data — only show steps with real info
+  const timelineSteps: Array<{ label: string; detail: string; active: boolean }> = [
+    { label: 'Record created', detail: formatDateTime(record.created_at), active: true },
+    { label: 'Verification outcome', detail: record.outcome, active: true },
+  ];
+  if (record.repair_type && record.repair_type !== 'none') {
+    timelineSteps.push({ label: 'Repair type', detail: record.repair_type, active: true });
+  }
+  if (record.payment_status && record.payment_status !== 'none') {
+    timelineSteps.push({ label: 'Payment status', detail: record.payment_status, active: record.payment_status === 'settled' });
+  }
+  timelineSteps.push({ label: 'Anchoring status', detail: record.anchoring_status, active: isAnchored });
 
   return (
     <div className="page">
@@ -116,41 +121,22 @@ export function RecordDetail() {
         <div className="card card-pad" style={{ marginBottom: 20 }}>
           <div className="section-title">Record timeline</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', paddingLeft: 24 }}>
-            {/* Timeline line */}
             <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--border)' }} />
-
-            {TIMELINE_STEPS.map((step, i) => {
-              const stepInfo = (() => {
-                switch (step.key) {
-                  case 'repair': return { active: hasRepair, detail: record.repair_type || 'none' };
-                  case 'payment': return { active: hasPayment, detail: record.payment_status || 'not applicable' };
-                  case 'anchor': return { active: isAnchored, detail: record.anchoring_status };
-                  case 'outcome': return { active: true, detail: record.outcome };
-                  default: return { active: true, detail: formatDateTime(record.created_at) };
-                }
-              })();
-              const { active, detail } = stepInfo;
-
-              return (
-                <div key={step.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, paddingBottom: i < TIMELINE_STEPS.length - 1 ? 16 : 0, position: 'relative' }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: -24,
-                    top: 4,
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: active ? 'var(--success)' : 'var(--surface-sunken)',
-                    border: `2px solid ${active ? 'var(--success)' : 'var(--border)'}`,
-                    zIndex: 1,
-                  }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--text)' : 'var(--text-faint)' }}>{step.label}</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>{detail}</div>
-                  </div>
+            {timelineSteps.map((step, i) => (
+              <div key={step.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, paddingBottom: i < timelineSteps.length - 1 ? 16 : 0, position: 'relative' }}>
+                <div style={{
+                  position: 'absolute', left: -24, top: 4, width: 16, height: 16,
+                  borderRadius: '50%',
+                  background: step.active ? 'var(--success)' : 'var(--surface-sunken)',
+                  border: `2px solid ${step.active ? 'var(--success)' : 'var(--border)'}`,
+                  zIndex: 1,
+                }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: step.active ? 'var(--text)' : 'var(--text-faint)' }}>{step.label}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>{step.detail}</div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
 
