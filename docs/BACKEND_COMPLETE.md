@@ -1051,7 +1051,7 @@ LocalVerificationRecord (SQLite) = Result + Receipt + AnchoringStatus
 | `FACILITATOR_URL` | `https://facilitator.goplausible.xyz` | GoPlausible AVM Facilitator |
 | `ALGORAND_NETWORK` | `algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=` | CAIP-2 network identifier |
 | `AVM_ADDRESS` | `GAVMWAOT52HYGQOPZAVYXA2NZHZX7DXRJYZQ5YVG4NXPQ3UUWLCHUBWVW4` | Payment receiver |
-| `SEMANTIC_REPAIR_PRICE` | `1000000` | 1 USDC (6 decimal places) |
+| `SEMANTIC_REPAIR_PRICE` | `10000` | 0.01 USDC (6 decimal places) |
 | ASA ID | `10458941` | USDC on Algorand TestNet |
 | Decimals | `6` | 1 USDC = 1,000,000 atomic units |
 
@@ -1070,7 +1070,7 @@ LocalVerificationRecord (SQLite) = Result + Receipt + AnchoringStatus
 | `API_V1_STR` | API prefix | `/api/v1` | No |
 | `FACILITATOR_URL` | GoPlausible URL | `https://facilitator.goplausible.xyz` | No |
 | `ALGORAND_NETWORK` | CAIP-2 network identifier | `algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=` | No |
-| `SEMANTIC_REPAIR_PRICE` | Payment amount (atomic units) | `1000000` | No |
+| `SEMANTIC_REPAIR_PRICE` | Payment amount (atomic units) | `10000` | No |
 | `AVM_ADDRESS` | Payment receiver address | `GAVMWAOT52HYGQOPZAVYXA2NZHZX7DXRJYZQ5YVG4NXPQ3UUWLCHUBWVW4` | No |
 | `DATABASE_PATH` | SQLite path | `backend/data/verified.db` | No |
 | `ANCHOR_ALGOD_ADDRESS` | Algorand node URL | `https://testnet-api.algonode.cloud` | No |
@@ -1119,7 +1119,7 @@ ENVIRONMENT=development
 LOG_LEVEL=INFO
 FACILITATOR_URL=https://facilitator.goplausible.xyz
 ALGORAND_NETWORK=algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=
-SEMANTIC_REPAIR_PRICE=1000000
+SEMANTIC_REPAIR_PRICE=10000
 AVM_ADDRESS=GAVMWAOT52HYGQOPZAVYXA2NZHZX7DXRJYZQ5YVG4NXPQ3UUWLCHUBWVW4
 ANCHOR_ALGOD_ADDRESS=https://testnet-api.algonode.cloud
 ANCHOR_ALGOD_TOKEN=

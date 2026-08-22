@@ -59,7 +59,7 @@ python scripts/demo_e2e.py --real  # Run real TestNet demo (in-process)
 # Server configuration (backend/.env)
 FACILITATOR_URL=https://facilitator.goplausible.xyz
 ALGORAND_NETWORK=algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=
-SEMANTIC_REPAIR_PRICE=1000000
+SEMANTIC_REPAIR_PRICE=10000
 ```
 
 ### Required for real TestNet demo:
