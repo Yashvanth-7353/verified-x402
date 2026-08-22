@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { WalletProvider as AlgoKitWalletProvider } from '@txnlab/use-wallet-react';
+import { walletManager } from './lib/walletConfig';
 import { Nav } from './components/Nav';
 import { Footer } from './components/Footer';
 import { MeshBackground } from './components/MeshBackground';
@@ -55,9 +57,11 @@ function App() {
 
   return (
     <ToastProvider>
-      <HashRouter>
-        <AppShell />
-      </HashRouter>
+      <AlgoKitWalletProvider manager={walletManager}>
+        <HashRouter>
+          <AppShell />
+        </HashRouter>
+      </AlgoKitWalletProvider>
     </ToastProvider>
   );
 }

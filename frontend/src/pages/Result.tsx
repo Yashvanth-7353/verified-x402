@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { semanticRepair, verifyReceipt } from '../api/client';
+import { useWallet } from '@txnlab/use-wallet-react';
+import { semanticRepair as callSemanticRepair, verifyReceipt } from '../api/client';
 import {
   ApiError,
   type PaymentRequiredChallenge,
@@ -12,20 +13,23 @@ import {
 import { EmptyState, ErrorBanner } from '../components/Feedback';
 import { FindingsList } from '../components/FindingsList';
 import { JsonView } from '../components/JsonView';
-import { PaymentRequiredCard, PaymentSettledCard } from '../components/PaymentCard';
+import { PaymentSettledCard } from '../components/PaymentCard';
 import { type Stage, PipelineStages } from '../components/PipelineStages';
 import { ReceiptCard } from '../components/ReceiptCard';
 import { RepairCompare } from '../components/RepairCompare';
 import { OutcomeBadge, Pill } from '../components/StatusBadge';
 import { VerificationSeal } from '../components/VerificationSeal';
-import { formatDateTime } from '../lib/format';
+import { formatDateTime, formatAtomicAmount, algorandExplorerUrl } from '../lib/format';
 import { appendSessionEntry } from '../lib/session';
+import { createWalletAvmSigner, createSignedPayment } from '../lib/x402Payment';
 
 interface LocationState {
   request: VerificationRequest;
   policy: SchemaPolicy;
   response: VerifyResponse;
 }
+
+type PaymentState = 'idle' | 'signing' | 'submitting' | 'settling' | 'settled' | 'failed' | 'cancelled';
 
 export function Result() {
   const location = useLocation();
@@ -34,9 +38,14 @@ export function Result() {
 
   const [response, setResponse] = useState<VerifyResponse | SemanticRepairResponse | undefined>(state?.response);
   const [escalating, setEscalating] = useState(false);
-  const [escalated, setEscalated] = useState(false);
   const [challenge, setChallenge] = useState<PaymentRequiredChallenge | null>(null);
   const [escalationError, setEscalationError] = useState<string | null>(null);
+
+  // Wallet payment state
+  const { activeAddress, signTransactions } = useWallet();
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle');
+  const [settlementTxId, setSettlementTxId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const [tamperResult, setTamperResult] = useState<'idle' | 'checking' | { valid: boolean; details: string }>('idle');
 
@@ -84,11 +93,7 @@ export function Result() {
                   ? 'active'
                   : 'skipped',
       },
-      {
-        key: 'repaired',
-        label: 'Repaired',
-        state: hasRepair ? 'done' : 'skipped',
-      },
+      { key: 'repaired', label: 'Repaired', state: hasRepair ? 'done' : 'skipped' },
       { key: 'revalidated', label: 'Re-validated', state: hasRepair ? 'done' : 'skipped' },
       { key: 'receipt', label: 'Receipt', state: response.result.outcome === 'rejected' ? 'failed' : 'done' },
     ];
@@ -118,19 +123,72 @@ export function Result() {
     setEscalating(true);
     setEscalationError(null);
     setChallenge(null);
+    setPaymentState('idle');
+    setSettlementTxId(null);
+    setPaymentError(null);
     try {
-      const paid = await semanticRepair({ request, policy });
+      const paid = await callSemanticRepair({ request, policy });
       setResponse(paid);
-      setEscalated(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 402) {
         setChallenge(e.challenge ?? null);
-        setEscalated(true);
       } else {
         setEscalationError(e instanceof Error ? e.message : 'Semantic repair failed.');
       }
     } finally {
       setEscalating(false);
+    }
+  };
+
+  const onPay = async () => {
+    if (!challenge || !activeAddress || !signTransactions) return;
+
+    setPaymentState('signing');
+    setPaymentError(null);
+
+    try {
+      // 1. Parse payment requirements from the 402 challenge
+      const paymentReq = challenge.accepts?.[0];
+      if (!paymentReq) throw new Error('No payment requirements in 402 response');
+
+      // 2. Build the full PaymentRequired structure for the x402 client
+      const paymentRequired = {
+        x402Version: challenge.x402Version,
+        accepts: challenge.accepts,
+        resource: challenge.resource,
+        error: challenge.error,
+      };
+
+      // 3. Create a ClientAvmSigner adapter from the wallet
+      const walletSigner = createWalletAvmSigner(activeAddress, signTransactions);
+
+      // 4. Use x402 to create the signed payment payload
+      const paymentSignature = await createSignedPayment(paymentRequired, walletSigner);
+
+      setPaymentState('submitting');
+
+      // 5. Send the signed payment to the backend
+      const paid = await callSemanticRepair({ request, policy }, paymentSignature);
+
+      // 6. Extract settlement tx from payment metadata
+      const meta = paid.payment_metadata;
+      if (meta?.algorand_tx_ref) {
+        setSettlementTxId(meta.algorand_tx_ref);
+      }
+
+      setPaymentState('settled');
+      setResponse(paid);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Payment failed';
+
+      // Distinguish wallet cancellation from other errors
+      if (msg.includes('cancelled') || msg.includes('rejected') || msg.includes('User declined')) {
+        setPaymentState('cancelled');
+        setPaymentError('Payment cancelled by wallet.');
+      } else {
+        setPaymentState('failed');
+        setPaymentError(msg);
+      }
     }
   };
 
@@ -148,10 +206,9 @@ export function Result() {
     }
   };
 
-  const canEscalate = response.result.outcome === 'rejected' && !escalated;
-
-  // Determine the semantic repair provider from repair_info
+  const canEscalate = response.result.outcome === 'rejected' && !challenge;
   const semanticProvider = response.result.repair_info?.semantic_repair_provider_ref;
+  const showPaymentFlow = Boolean(challenge) && !paymentMeta;
 
   return (
     <div className="page">
@@ -190,9 +247,7 @@ export function Result() {
               <RepairCompare repairInfo={response.result.repair_info} before={request.output_payload} />
               {semanticProvider && (
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="badge badge-accent">
-                    Provider: {semanticProvider}
-                  </span>
+                  <span className="badge badge-accent">Provider: {semanticProvider}</span>
                   {semanticProvider.includes('Groq') && (
                     <span className="badge badge-pending">Model: openai/gpt-oss-20b</span>
                   )}
@@ -201,7 +256,8 @@ export function Result() {
             </div>
           )}
 
-          {canEscalate && (
+          {/* Escalation button */}
+          {canEscalate && !showPaymentFlow && (
             <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div>
                 <h3 style={{ fontSize: 16, marginBottom: 4 }}>Local repair couldn't resolve this</h3>
@@ -219,24 +275,143 @@ export function Result() {
 
           {escalationError && <ErrorBanner title="Escalation failed" message={escalationError} />}
 
-          {challenge && !paymentMeta && (
-            <div>
-              <PaymentRequiredCard challenge={challenge} />
-              <div className="card card-pad" style={{ marginTop: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
-                <strong>Why can't I pay from the browser?</strong>
-                <p style={{ marginTop: 6 }}>
-                  Verified uses the x402 protocol, which requires constructing and signing an Algorand
-                  USDC transaction. The current architecture completes payment settlement through the
-                  backend's x402 client (<code className="mono">backend/scripts/e2e_client.py</code>),
-                  which holds the payer's private key server-side. The frontend never receives or handles
-                  private keys — this is by design.
-                </p>
-                <p style={{ marginTop: 8 }}>
-                  To complete the payment, run the backend's E2E client script, then re-trigger this
-                  escalation. The paid result will show the settled payment metadata, repaired output,
-                  and signed receipt.
-                </p>
+          {/* Wallet payment flow */}
+          {showPaymentFlow && (
+            <div className="card card-pad" style={{ borderColor: 'var(--seal-border)', background: 'var(--seal-bg)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 18 }}>Payment required</h3>
+                <Pill tone="warning">HTTP 402</Pill>
               </div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Semantic repair requires a settled x402 payment on Algorand TestNet.
+                Connect your Algorand wallet to sign and submit the payment.
+              </p>
+
+              {/* Payment details from 402 response */}
+              {challenge.accepts?.[0] && (
+                <div className="kv-grid" style={{ marginBottom: 16 }}>
+                  <div className="kv">
+                    <span className="kv-label">Amount</span>
+                    <span className="kv-value">{formatAtomicAmount(challenge.accepts[0].amount, challenge.accepts[0].extra?.decimals ?? 6)} USDC</span>
+                  </div>
+                  <div className="kv">
+                    <span className="kv-label">Network</span>
+                    <span className="kv-value">{challenge.accepts[0].network}</span>
+                  </div>
+                  <div className="kv">
+                    <span className="kv-label">Asset</span>
+                    <span className="kv-value mono">{challenge.accepts[0].asset}</span>
+                  </div>
+                  <div className="kv">
+                    <span className="kv-label">Recipient</span>
+                    <span className="kv-value mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>{challenge.accepts[0].payTo}</span>
+                  </div>
+                  <div className="kv">
+                    <span className="kv-label">Facilitator</span>
+                    <span className="kv-value">GoPlausible AVM</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment states */}
+              {paymentState === 'idle' && (
+                <div>
+                  {!activeAddress ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 8, fontSize: 13 }}>
+                      <span style={{ color: 'var(--warning)', fontWeight: 600 }}>⚠</span>
+                      <span>Connect your Algorand wallet to proceed with payment.</span>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn btn-accent" onClick={onPay} style={{ width: '100%', justifyContent: 'center' }}>
+                      Pay {formatAtomicAmount(challenge.accepts?.[0]?.amount, challenge.accepts?.[0]?.extra?.decimals ?? 6)} USDC
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {paymentState === 'signing' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 8, fontSize: 13 }}>
+                  <span className="spinner spinner-dark" />
+                  <span>Awaiting wallet approval…</span>
+                </div>
+              )}
+
+              {paymentState === 'submitting' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 8, fontSize: 13 }}>
+                  <span className="spinner spinner-dark" />
+                  <span>Payment submitted — waiting for settlement…</span>
+                </div>
+              )}
+
+              {paymentState === 'settled' && settlementTxId && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, fontSize: 13 }}>
+                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>✓</span>
+                  <span>Payment settled</span>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
+                    <a href={algorandExplorerUrl(settlementTxId)} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-strong)' }}>
+                      View on Explorer →
+                    </a>
+                  </span>
+                </div>
+              )}
+
+              {paymentState === 'cancelled' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 8, fontSize: 13 }}>
+                    <span style={{ color: 'var(--warning)' }}>⚠</span>
+                    <span>Payment cancelled</span>
+                  </div>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaymentState('idle')} style={{ marginTop: 8 }}>
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {paymentState === 'failed' && (
+                <div>
+                  <ErrorBanner title="Payment failed" message={paymentError ?? 'Unknown error'} />
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaymentState('idle')} style={{ marginTop: 8 }}>
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {/* Technical details */}
+              {challenge.accepts?.[0] && (
+                <details className="tech" style={{ marginTop: 12 }}>
+                  <summary>Technical details</summary>
+                  <div className="kv-grid" style={{ marginTop: 8 }}>
+                    <div className="kv">
+                      <span className="kv-label">x402 Version</span>
+                      <span className="kv-value mono">{challenge.x402Version}</span>
+                    </div>
+                    <div className="kv">
+                      <span className="kv-label">Scheme</span>
+                      <span className="kv-value mono">{challenge.accepts[0].scheme}</span>
+                    </div>
+                    <div className="kv">
+                      <span className="kv-label">Asset ID</span>
+                      <span className="kv-value mono">{challenge.accepts[0].asset}</span>
+                    </div>
+                    <div className="kv">
+                      <span className="kv-label">Atomic Amount</span>
+                      <span className="kv-value mono">{challenge.accepts[0].amount}</span>
+                    </div>
+                    {challenge.accepts[0].extra?.feePayer && (
+                      <div className="kv">
+                        <span className="kv-label">Fee Payer</span>
+                        <span className="kv-value mono" style={{ fontSize: 11 }}>{challenge.accepts[0].extra.feePayer}</span>
+                      </div>
+                    )}
+                    {challenge.accepts[0].maxTimeoutSeconds && (
+                      <div className="kv">
+                        <span className="kv-label">Timeout</span>
+                        <span className="kv-value">{challenge.accepts[0].maxTimeoutSeconds}s</span>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
             </div>
           )}
 

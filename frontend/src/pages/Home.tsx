@@ -26,7 +26,7 @@ const FEATURES = [
   {
     eyebrow: 'Invariant 03',
     title: 'Escalation costs something real',
-    body: "Semantic repair is never invoked without a settled x402 payment on Algorand, verified through the GoPlausible facilitator. Payment success never implies verification success.",
+    body: "Semantic repair is never invoked without a settled x402 payment on Algorand, verified through the GoPlausible facilitator. The user signs the payment from their own Algorand wallet — no private key ever reaches the browser.",
     visual: 'ledger',
   },
   {
@@ -55,6 +55,7 @@ const TECH = [
   { label: 'SHA-256', desc: 'Hashing' },
   { label: 'Merkle Tree', desc: 'Batch commitment' },
   { label: 'Algorand', desc: 'TestNet anchor' },
+  { label: 'Pera Wallet', desc: 'Browser signing' },
 ];
 
 function FeatureVisual({ kind }: { kind: string }) {
@@ -85,7 +86,7 @@ function FeatureVisual({ kind }: { kind: string }) {
         <div style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--seal-strong)', lineHeight: 2 }}>
           <div>HTTP 402 · Payment Required</div>
           <div>scheme: exact · asset: USDC</div>
-          <div className="mono" style={{ opacity: 0.6 }}>network: algorand:testnet…</div>
+          <div className="mono" style={{ opacity: 0.6 }}>wallet signs → GoPlausible settles</div>
           <div style={{ color: 'var(--success)' }}>✓ settled → semantic repair authorized</div>
         </div>
       </div>
