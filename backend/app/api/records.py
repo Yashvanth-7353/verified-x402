@@ -78,6 +78,7 @@ def _record_to_summary(row: dict) -> RecordSummary:
 def _record_to_detail(row: dict) -> RecordDetail:
     """Convert a database row to a safe RecordDetail."""
     base = _record_to_summary(row)
+    # repair_type is already in base via RecordSummary.model_dump()
     return RecordDetail(
         **base.model_dump(),
         schema_ref_and_version=row.get("schema_ref_and_version"),
@@ -85,7 +86,6 @@ def _record_to_detail(row: dict) -> RecordDetail:
         signing_key_id=row.get("signing_key_id"),
         signature_algorithm=row.get("signature_algorithm"),
         agent_identifier=row.get("agent_identifier"),
-        repair_type=row.get("repair_type"),
         payment_facilitator=row.get("payment_facilitator"),
         settlement_network=row.get("settlement_network"),
     )
