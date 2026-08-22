@@ -30,8 +30,13 @@ function decodeChallenge(res: Response): PaymentRequiredChallenge | undefined {
   }
 }
 
+/**
+ * Base URL for API calls. When VITE_API_BASE_URL is not set, uses empty
+ * string (relative) so the Vite dev server proxy forwards /api/* to the
+ * backend. In production, set VITE_API_BASE_URL to the backend origin.
+ */
 export const API_BASE: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
 async function parseJson(res: Response): Promise<unknown> {
   const text = await res.text();

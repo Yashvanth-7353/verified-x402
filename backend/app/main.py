@@ -118,6 +118,22 @@ _payment_routes = {
 # ---------------------------------------------------------------------------
 # Phase 8 Custom Middleware — verify → settle → handler
 # ---------------------------------------------------------------------------
+def _cors_json_response(request: Request, content: Any, status_code: int, headers: dict | None = None) -> JSONResponse:
+    """Create a JSONResponse with CORS headers for the given request.
+
+    The x402 middleware returns responses directly (bypassing the normal
+    handler path), so CORSMiddleware may not wrap them. Adding CORS
+    headers here ensures the browser can read 402 payment challenges.
+    """
+    origin = request.headers.get("origin", "*")
+    resp = JSONResponse(content=content, status_code=status_code, headers=headers)
+    resp.headers["access-control-allow-origin"] = origin
+    resp.headers["access-control-allow-credentials"] = "true"
+    resp.headers["access-control-allow-methods"] = "*"
+    resp.headers["access-control-allow-headers"] = "*"
+    return resp
+
+
 def _verified_payment_middleware(
     routes: dict[str, Any],
     x402_server: x402ResourceServer,
@@ -172,21 +188,22 @@ def _verified_payment_middleware(
         if result.type == "payment-error":
             response_instructions = result.response
             if response_instructions is None:
-                return JSONResponse(
-                    content={"error": "Payment required"},
-                    status_code=402,
-                )
+                return _cors_json_response(request, {"error": "Payment required"}, 402)
             if getattr(response_instructions, "is_html", False):
                 from starlette.responses import HTMLResponse
-                return HTMLResponse(
+                resp = HTMLResponse(
                     content=response_instructions.body,
                     status_code=response_instructions.status,
                     headers=response_instructions.headers,
                 )
-            return JSONResponse(
-                content=response_instructions.body or {},
-                status_code=response_instructions.status,
-                headers=response_instructions.headers,
+                origin = request.headers.get("origin", "*")
+                resp.headers["access-control-allow-origin"] = origin
+                return resp
+            return _cors_json_response(
+                request,
+                response_instructions.body or {},
+                response_instructions.status,
+                dict(response_instructions.headers) if response_instructions.headers else None,
             )
 
         if result.type == "payment-verified":
@@ -201,12 +218,13 @@ def _verified_payment_middleware(
                     "x402 settlement failed after verification: %s",
                     settle_result.error_reason,
                 )
-                return JSONResponse(
-                    content={
+                return _cors_json_response(
+                    request,
+                    {
                         "error": "Settlement failed",
                         "details": settle_result.error_reason,
                     },
-                    status_code=402,
+                    402,
                 )
 
             # Store payment + settlement info on request.state so the
