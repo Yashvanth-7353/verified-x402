@@ -18,12 +18,26 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Leaf size in bytes (SHA-256 digest)
 LEAF_BYTES = 32
+
+# Canonical receipt_hash: exactly 64 lowercase hex characters (SHA-256 hexdigest)
+_HEX64_RE = re.compile(r'^[0-9a-f]{64}$')
+
+
+def is_valid_receipt_hash(receipt_hash: Optional[str]) -> bool:
+    """
+    Validate that a receipt_hash is a canonical 64-character hex string.
+
+    The canonical format is produced by hashlib.sha256(...).hexdigest()
+    which returns exactly 64 lowercase hex characters.
+    """
+    return bool(receipt_hash and _HEX64_RE.match(receipt_hash))
 
 
 def _sha256(data: bytes) -> bytes:
