@@ -46,8 +46,13 @@ logs/
 
 # Database files
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+
+# Supabase CLI
+supabase/.temp/
 
 # OS files
 .DS_Store

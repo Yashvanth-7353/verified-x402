@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     # Phase 9: Local Verification Record Store
     DATABASE_PATH: str = ""  # Empty = use default backend/data/verified.db
+    # If set, overrides DATABASE_PATH entirely: records are persisted to this
+    # Postgres connection string (e.g. a Supabase project) instead of SQLite.
+    # Read directly from the environment by app/storage/store.py.
+    DATABASE_URL: str = ""
 
     # Phase 10: Merkle Anchoring
     ANCHOR_PRIVATE_KEY: str = ""  # Base64-encoded Algorand private key for anchoring

@@ -1,5 +1,5 @@
 """
-Phase 9: Local Verification Record Store (SQLite backend).
+Phase 9: Local Verification Record Store (SQLite or Postgres/Supabase backend).
 
 Persists finalized verification records locally so that every verification
 request produces a durable audit trail bridging the receipt system to
@@ -8,6 +8,11 @@ future Merkle anchoring.
 Privacy invariant: raw payloads, private keys, X-PAYMENT data, and
 recovery phrases are NEVER stored. Only identifiers, hashes, outcomes,
 receipt metadata, payment references, and anchoring metadata are persisted.
+
+Backend selection: if the DATABASE_URL environment variable is set (a
+Postgres connection string, e.g. a Supabase project), records are persisted
+there. Otherwise falls back to a local SQLite file — used for local
+development so no external database is required to run the app.
 
 Architecture:
     VerificationRequest
@@ -24,11 +29,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel
@@ -36,6 +43,12 @@ from pydantic import BaseModel
 from app.models.enums import AnchoringStatus
 from app.models.verification import VerificationResult, VerificationReceipt
 from app.models.payments import PaymentMetadata
+
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:  # psycopg2 is only required when DATABASE_URL is set
+    psycopg2 = None
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +82,7 @@ class LocalVerificationRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# SQLite schema
+# Schema (compatible with both SQLite and Postgres)
 # ---------------------------------------------------------------------------
 
 _SCHEMA_SQL = """
@@ -130,10 +143,10 @@ def _deserialize_payment_metadata(json_str: Optional[str]) -> Optional[PaymentMe
 
 class LocalVerificationRecordStore:
     """
-    SQLite-backed store for finalized verification records.
+    Stores finalized verification records in SQLite (local dev) or Postgres
+    (production, e.g. Supabase — set DATABASE_URL to enable).
 
-    Thread-safe: uses a threading.Lock around all database operations
-    since SQLite in WAL mode supports concurrent reads but serialized writes.
+    Thread-safe: uses a thread-local connection per thread.
 
     Lifecycle:
         1. save() — called after receipt generation (finalized state only)
@@ -152,36 +165,78 @@ class LocalVerificationRecordStore:
         Initialize the store.
 
         Args:
-            db_path: Path to the SQLite database file. If None, uses
-                     a default path relative to the project backend directory.
+            db_path: Path to the SQLite database file, used only when
+                     DATABASE_URL is not set. If None, uses a default path
+                     relative to the project backend directory.
         """
-        if db_path is None:
-            # Default: backend/data/verified.db
-            backend_dir = Path(__file__).resolve().parent.parent.parent
-            data_dir = backend_dir / "data"
-            data_dir.mkdir(exist_ok=True)
-            db_path = str(data_dir / "verified.db")
+        self._database_url = os.environ.get("DATABASE_URL")
 
-        self._db_path = db_path
+        if self._database_url:
+            if psycopg2 is None:
+                raise RuntimeError(
+                    "DATABASE_URL is set but psycopg2 is not installed. "
+                    "Add psycopg2-binary to requirements.txt."
+                )
+            self._dialect = "postgres"
+            self._db_path = None
+        else:
+            self._dialect = "sqlite"
+            if db_path is None:
+                # Default: backend/data/verified.db
+                backend_dir = Path(__file__).resolve().parent.parent.parent
+                data_dir = backend_dir / "data"
+                data_dir.mkdir(exist_ok=True)
+                db_path = str(data_dir / "verified.db")
+            self._db_path = db_path
+
         self._local = threading.local()
         self._init_db()
 
-    def _get_conn(self) -> sqlite3.Connection:
+    def _get_conn(self):
         """Get a thread-local database connection."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
-            conn = sqlite3.connect(self._db_path)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA foreign_keys=ON")
+            if self._dialect == "postgres":
+                conn = psycopg2.connect(
+                    self._database_url,
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                )
+            else:
+                conn = sqlite3.connect(self._db_path)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA foreign_keys=ON")
             self._local.conn = conn
         return self._local.conn
+
+    def _adapt_sql(self, sql: str) -> str:
+        """Convert SQLite-style `?` placeholders to psycopg2-style `%s`."""
+        if self._dialect == "postgres":
+            return sql.replace("?", "%s")
+        return sql
+
+    def _execute(self, conn, sql: str, params=()):
+        """Execute a statement, returning a cursor-like object with fetch*()."""
+        sql = self._adapt_sql(sql)
+        if self._dialect == "postgres":
+            cur = conn.cursor()
+            cur.execute(sql, params)
+            return cur
+        return conn.execute(sql, params)
 
     def _init_db(self):
         """Initialize the database schema."""
         conn = self._get_conn()
-        conn.executescript(_SCHEMA_SQL)
+        if self._dialect == "postgres":
+            cur = conn.cursor()
+            cur.execute(_SCHEMA_SQL)
+        else:
+            conn.executescript(_SCHEMA_SQL)
         conn.commit()
-        logger.info("Local verification record store initialized at %s", self._db_path)
+        if self._dialect == "postgres":
+            host = urlparse(self._database_url).hostname
+            logger.info("Local verification record store initialized (postgres @ %s)", host)
+        else:
+            logger.info("Local verification record store initialized at %s", self._db_path)
 
     def close(self):
         """Close the thread-local database connection."""
@@ -214,8 +269,9 @@ class LocalVerificationRecordStore:
             The created LocalVerificationRecord.
 
         Raises:
-            sqlite3.IntegrityError: If request_id conflicts with an existing
-                record that has a different receipt_id (integrity conflict).
+            sqlite3.IntegrityError / psycopg2.IntegrityError: If request_id
+                conflicts with an existing record that has a different
+                receipt_id (integrity conflict).
         """
         record = LocalVerificationRecord(
             record_id=uuid4(),
@@ -233,7 +289,8 @@ class LocalVerificationRecordStore:
 
         conn = self._get_conn()
         try:
-            conn.execute(
+            self._execute(
+                conn,
                 """
                 INSERT INTO local_verification_records
                 (record_id, request_id, receipt_id, outcome, receipt_hash,
@@ -269,7 +326,11 @@ class LocalVerificationRecordStore:
             )
             return record
 
-        except sqlite3.IntegrityError as e:
+        except (sqlite3.IntegrityError, *((psycopg2.IntegrityError,) if psycopg2 else ())) as e:
+            # A Postgres transaction is aborted after an error — roll back
+            # before issuing any further query on this connection.
+            conn.rollback()
+
             # Check if it's a duplicate save (same request_id + same receipt_id)
             # or a conflict (same request_id, different receipt_id)
             existing = self.get_by_request_id(record.request_id)
@@ -317,7 +378,8 @@ class LocalVerificationRecordStore:
         existing = self.get_by_request_id(request_id)
         if existing is not None:
             # UPDATE the existing record with the final state
-            conn.execute(
+            self._execute(
+                conn,
                 """
                 UPDATE local_verification_records
                 SET outcome = ?,
@@ -364,7 +426,8 @@ class LocalVerificationRecordStore:
             anchoring_status=AnchoringStatus.unanchored,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
-        conn.execute(
+        self._execute(
+            conn,
             """
             INSERT INTO local_verification_records
             (record_id, request_id, receipt_id, outcome, receipt_hash,
@@ -408,7 +471,8 @@ class LocalVerificationRecordStore:
             The LocalVerificationRecord if found, None otherwise.
         """
         conn = self._get_conn()
-        row = conn.execute(
+        row = self._execute(
+            conn,
             "SELECT * FROM local_verification_records WHERE request_id = ?",
             (request_id,),
         ).fetchone()
@@ -429,7 +493,8 @@ class LocalVerificationRecordStore:
             The LocalVerificationRecord if found, None otherwise.
         """
         conn = self._get_conn()
-        row = conn.execute(
+        row = self._execute(
+            conn,
             "SELECT * FROM local_verification_records WHERE receipt_id = ?",
             (receipt_id,),
         ).fetchone()
@@ -452,7 +517,8 @@ class LocalVerificationRecordStore:
         Does NOT mutate anchoring status while reading.
         """
         conn = self._get_conn()
-        rows = conn.execute(
+        rows = self._execute(
+            conn,
             """
             SELECT * FROM local_verification_records
             WHERE anchoring_status = 'unanchored'
@@ -479,10 +545,10 @@ class LocalVerificationRecordStore:
             anchor_tx_ref: The Algorand transaction reference.
         """
         conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
 
         for record_id in record_ids:
-            conn.execute(
+            self._execute(
+                conn,
                 """
                 UPDATE local_verification_records
                 SET anchoring_status = 'anchored',
@@ -505,8 +571,8 @@ class LocalVerificationRecordStore:
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_record(row: sqlite3.Row) -> LocalVerificationRecord:
-        """Convert a database row to a LocalVerificationRecord."""
+    def _row_to_record(row) -> LocalVerificationRecord:
+        """Convert a database row (sqlite3.Row or psycopg2 RealDictRow) to a LocalVerificationRecord."""
         return LocalVerificationRecord(
             record_id=UUID(row["record_id"]),
             request_id=row["request_id"],
@@ -548,7 +614,8 @@ class LocalVerificationRecordStore:
             List of dicts with safe metadata fields.
         """
         conn = self._get_conn()
-        rows = conn.execute(
+        rows = self._execute(
+            conn,
             """
             SELECT record_id, request_id, receipt_id, outcome, receipt_hash,
                    output_hash, anchoring_status, merkle_root, anchor_tx_ref,
@@ -586,7 +653,7 @@ class LocalVerificationRecordStore:
                 d["repair_type"] = None
 
             try:
-                pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+                pm = _deserialize_payment_metadata(row["payment_metadata_json"])
                 if pm:
                     d["payment_status"] = pm.payment_status.value
                     d["payment_facilitator"] = pm.facilitator
@@ -615,7 +682,8 @@ class LocalVerificationRecordStore:
             Dict with safe metadata fields, or None if not found.
         """
         conn = self._get_conn()
-        row = conn.execute(
+        row = self._execute(
+            conn,
             "SELECT * FROM local_verification_records WHERE record_id = ?",
             (record_id,),
         ).fetchone()
@@ -647,7 +715,7 @@ class LocalVerificationRecordStore:
             d["repair_type"] = None
 
         try:
-            pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+            pm = _deserialize_payment_metadata(row["payment_metadata_json"])
             if pm:
                 d["payment_status"] = pm.payment_status.value
                 d["payment_facilitator"] = pm.facilitator
