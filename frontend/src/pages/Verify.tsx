@@ -32,9 +32,12 @@ export function Verify() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedExample, setSelectedExample] = useState<string | null>(EXAMPLES[0].id);
+
   const applyExample = (id: string) => {
     const ex = EXAMPLES.find((e) => e.id === id);
     if (!ex) return;
+    setSelectedExample(id);
     setOutputType(ex.outputType);
     setSchemaRef(ex.schemaRef);
     setSchemaVersion(ex.schemaVersion);
@@ -95,12 +98,32 @@ export function Verify() {
         </p>
 
         <div className="section-title">Try an example</div>
-        <div className="tag-row" style={{ marginBottom: 24 }}>
-          {EXAMPLES.map((ex) => (
-            <button key={ex.id} type="button" className="btn btn-ghost btn-sm" onClick={() => applyExample(ex.id)} title={ex.description}>
-              {ex.label}
-            </button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10, marginBottom: 24 }}>
+          {EXAMPLES.map((ex) => {
+            const isActive = selectedExample === ex.id;
+            const indicatorColor = ex.indicator === 'pass' ? 'var(--success)' : ex.indicator === 'warn' ? 'var(--warning)' : 'var(--danger)';
+            const indicatorIcon = ex.indicator === 'pass' ? '✓' : ex.indicator === 'warn' ? '⚠' : '✕';
+            return (
+              <button
+                key={ex.id}
+                type="button"
+                onClick={() => applyExample(ex.id)}
+                className="glass"
+                style={{
+                  textAlign: 'left', padding: '12px 14px', borderRadius: 10,
+                  border: `1.5px solid ${isActive ? indicatorColor : 'rgba(255,255,255,0.12)'}`,
+                  background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                  cursor: 'pointer', transition: 'border-color 200ms, background 200ms',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, color: indicatorColor, fontWeight: 700 }}>{indicatorIcon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--grotesk)', color: 'var(--text)' }}>{ex.label}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.4 }}>{ex.hint}</div>
+              </button>
+            );
+          })}
         </div>
 
         <Reveal variant="scale" className="card card-pad">
