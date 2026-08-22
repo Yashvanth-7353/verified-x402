@@ -11,14 +11,18 @@ receipt metadata, payment references, and anchoring metadata are persisted.
 
 Backend selection:
     - DATABASE_URL unset (typical local dev): SQLite only, at db_path.
-    - DATABASE_URL set (a Postgres connection string, e.g. a Supabase
-      project — always set in production): Postgres is PRIMARY (all reads
-      and the authoritative write), and every write is also mirrored,
-      best-effort, to the local SQLite file. A mirror write failure is
-      logged and does not fail the request — Postgres is the source of
-      truth. The mirror is self-healing: each mirror write checks whether
-      the row already exists there and inserts or updates accordingly, so
-      a previously-failed or missed mirror write is caught up automatically
+    - DATABASE_URL set on Render (RENDER=true is auto-injected there):
+      Postgres/Supabase only. No local SQLite mirror — Render's disk is
+      ephemeral, so a mirror there would just be a throwaway file, not a
+      real second copy.
+    - DATABASE_URL set anywhere else (e.g. you point your own machine at
+      the Supabase project): Postgres is PRIMARY (all reads and the
+      authoritative write), and every write is also mirrored, best-effort,
+      to your local SQLite file — a real, durable local copy in that case.
+      A mirror write failure is logged and does not fail the request. The
+      mirror is self-healing: each mirror write checks whether the row
+      already exists there and inserts or updates accordingly, so a
+      previously-failed or missed mirror write is caught up automatically
       on the next write for that request_id.
 
 Architecture:
@@ -205,9 +209,11 @@ def _update_params(record: LocalVerificationRecord) -> tuple:
 class LocalVerificationRecordStore:
     """
     Stores finalized verification records. Postgres (Supabase) is primary
-    whenever DATABASE_URL is set — including always in production — with
-    SQLite kept as a live mirror. Without DATABASE_URL (typical local dev),
-    SQLite alone is used, unchanged from before.
+    whenever DATABASE_URL is set. On Render, that's Supabase only — no
+    local mirror, since Render's disk is ephemeral. Anywhere else with
+    DATABASE_URL set (e.g. your own machine pointed at Supabase), SQLite
+    is kept as a live, self-healing mirror. Without DATABASE_URL (typical
+    local dev), SQLite alone is used.
 
     Thread-safe: uses thread-local connections per dialect.
 
@@ -249,7 +255,10 @@ class LocalVerificationRecordStore:
         self._sqlite_path = db_path
 
         self._primary = "postgres" if self._database_url else "sqlite"
-        self._mirror = "sqlite" if self._primary == "postgres" else None
+        # No mirror on Render: its disk is ephemeral, so a "local" SQLite
+        # file there is a throwaway copy, not a real second database.
+        on_render = bool(os.environ.get("RENDER"))
+        self._mirror = "sqlite" if (self._primary == "postgres" and not on_render) else None
 
         self._local = threading.local()
 
@@ -260,9 +269,10 @@ class LocalVerificationRecordStore:
         if self._primary == "postgres":
             host = urlparse(self._database_url).hostname
             logger.info(
-                "Local verification record store initialized: primary=postgres@%s mirror=%s",
+                "Local verification record store initialized: primary=postgres@%s mirror=%s%s",
                 host,
                 self._sqlite_path if self._mirror else "none",
+                " (disabled on Render)" if on_render and not self._mirror else "",
             )
         else:
             logger.info("Local verification record store initialized at %s (sqlite only)", self._sqlite_path)
