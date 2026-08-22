@@ -73,23 +73,41 @@ export function Result() {
     const hasRepair = Boolean(response.result.repair_info);
     const isSemanticRepair = response.result.repair_info?.repair_type === 'semantic';
     const isRejected = response.result.outcome === 'rejected';
+    const isVerifiedRepaired = response.result.outcome === 'verified_repaired';
     const isPaid = paymentMeta?.payment_status === 'settled';
+    const hasRepairedOutput = Boolean('repaired_output' in response && response.repaired_output);
 
-    // Escalation stage: show if user requested semantic repair or it was attempted
+    // Escalation: show when user requested semantic repair or it was attempted
     const showEscalation = escalationAttempted || escalating || isSemanticRepair || isPaid || (isRejected && challenge != null);
     const escalatedState: Stage['state'] = escalating ? 'active' : showEscalation ? 'done' : 'skipped';
 
-    // Paid stage: show only when semantic repair path was entered
+    // Paid: show when semantic repair path was entered
     const paidState: Stage['state'] = isPaid ? 'done' : escalating ? 'active' : challenge ? 'pending' : 'skipped';
 
-    // Repair stage: show when backend reports a repair was performed
-    const repairedState: Stage['state'] = hasRepair ? 'done' : (isPaid && !isRejected) ? 'active' : 'skipped';
+    // Repair stages depend on the three semantic repair outcomes:
+    // A. Candidate accepted (repair_info + verified_repaired): Repaired ✓, Re-validated ✓
+    // B. Candidate rejected (hasRepairedOutput + rejected): Repaired ✓, Re-validated ✗
+    // C. No candidate (isPaid + rejected + no repair_info): Repaired ✗, Re-validated —
+    let repairedState: Stage['state'] = 'skipped';
+    let revalidatedState: Stage['state'] = 'skipped';
 
-    // Re-validation stage: show when repair occurred and was accepted
-    const revalidatedState: Stage['state'] = hasRepair ? 'done' : 'skipped';
-
-    // Receipt stage: backend always generates a receipt (even for rejected)
-    const receiptState: Stage['state'] = 'done';
+    if (isVerifiedRepaired && hasRepair) {
+      // Case A: candidate accepted after re-validation
+      repairedState = 'done';
+      revalidatedState = 'done';
+    } else if (isRejected && hasRepairedOutput && isPaid) {
+      // Case B: candidate generated but re-validation failed
+      repairedState = 'done';
+      revalidatedState = 'failed';
+    } else if (isRejected && !hasRepair && isPaid) {
+      // Case C: payment made but no candidate generated (Groq failed)
+      repairedState = 'failed';
+      revalidatedState = 'skipped';
+    } else if (hasRepair && !isSemanticRepair) {
+      // Deterministic repair (no payment needed)
+      repairedState = 'done';
+      revalidatedState = 'done';
+    }
 
     return [
       { key: 'submitted', label: 'Submitted', state: 'done' },
@@ -98,7 +116,7 @@ export function Result() {
       { key: 'paid', label: 'Paid', state: paidState },
       { key: 'repaired', label: 'Repaired', state: repairedState },
       { key: 'revalidated', label: 'Re-validated', state: revalidatedState },
-      { key: 'receipt', label: 'Receipt', state: receiptState },
+      { key: 'receipt', label: 'Receipt', state: 'done' },
     ];
   }, [response, challenge, escalating, escalationAttempted, paymentMeta]);
 
@@ -214,6 +232,7 @@ export function Result() {
   const semanticProvider = response.result.repair_info?.semantic_repair_provider_ref;
   const showPaymentFlow = Boolean(challenge) && !paymentMeta;
   const wasPaidButFailed = paymentMeta?.payment_status === 'settled' && response.result.outcome === 'rejected' && !response.result.repair_info;
+  const wasPaidCandidateRejected = paymentMeta?.payment_status === 'settled' && response.result.outcome === 'rejected' && Boolean('repaired_output' in response && response.repaired_output);
 
   return (
     <div className="page">
@@ -243,6 +262,11 @@ export function Result() {
               Payment was settled on Algorand TestNet, but the semantic-repair provider could not produce a valid candidate. The output remains rejected.
             </p>
           )}
+          {wasPaidCandidateRejected && (
+            <p style={{ fontSize: 12.5, color: 'var(--warning)', marginTop: 12 }}>
+              Payment was settled and a repair candidate was generated, but the candidate failed re-validation. The output remains rejected.
+            </p>
+          )}
         </div>
 
         <div className="stagger-children" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -263,6 +287,30 @@ export function Result() {
                   )}
                 </div>
               )}
+              {/* Show actual repaired output when backend provides it */}
+              {'repaired_output' in response && response.repaired_output && (
+                <div style={{ marginTop: 16 }}>
+                  <div className="section-title">Groq repaired output</div>
+                  <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginBottom: 8 }}>
+                    The candidate repair generated by the semantic-repair provider and accepted by re-validation.
+                  </p>
+                  <JsonView data={response.repaired_output} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Show failed candidate when re-validation rejected it */}
+          {wasPaidCandidateRejected && response.result.repair_info && (
+            <div className="card card-pad" style={{ borderColor: 'var(--danger-border)', background: 'var(--danger-bg)' }}>
+              <div className="section-title" style={{ color: 'var(--danger)' }}>Re-validation failed</div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 8 }}>
+                The candidate generated by the semantic-repair provider did not satisfy the verification policy.
+                Groq proposes a repair, but Verified never trusts it directly — the candidate is passed through the same verification pipeline again before acceptance.
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600 }}>
+                Cannot repair this output safely.
+              </p>
             </div>
           )}
 

@@ -41,8 +41,12 @@ class SemanticRepairResponse(BaseModel):
     API response model for the /semantic-repair endpoint.
     Returns the verification result, receipt, and (when semantic repair
     was attempted with a settled payment) the PaymentMetadata.
+    When a semantic repair candidate was generated (whether accepted or
+    rejected by re-validation), the repaired_output is included so the
+    frontend can display the actual Groq output.
     Never returns raw payload or any payment credentials.
     """
     result: VerificationResult
     receipt: VerificationReceipt
     payment_metadata: Optional[PaymentMetadata] = None
+    repaired_output: Optional[dict] = None

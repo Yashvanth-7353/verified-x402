@@ -149,6 +149,7 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
 
         final_payload = payload.request.output_payload
         final_result = initial_result
+        repaired_output = None  # Actual candidate from Groq, if generated
 
         # 2. Attempt exactly ONE semantic repair pass
         schema_is_invalid = any(
@@ -165,6 +166,9 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
             )
 
             if repair_info is not None:
+                # Candidate was generated — capture it regardless of re-validation outcome
+                repaired_output = candidate_payload
+
                 # 3. MANDATORY revalidation — payment does NOT equal success
                 repaired_request = payload.request.model_copy()
                 repaired_request.output_payload = candidate_payload
@@ -194,6 +198,7 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
                         repair_info.payment_ref,
                     )
                 else:
+                    # Candidate generated but failed re-validation
                     logger.info(
                         "semantic_repair: revalidation still failed for request_id=%s, "
                         "outcome=rejected (payment consumed, repair failed)",
@@ -232,6 +237,7 @@ def semantic_repair(payload: SemanticRepairRequest, request: Request) -> Semanti
             result=final_result,
             receipt=receipt,
             payment_metadata=payment_metadata,
+            repaired_output=repaired_output,
         )
 
         # Phase 9: Persist the finalized record

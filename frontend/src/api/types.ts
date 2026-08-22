@@ -91,6 +91,10 @@ export interface VerifyResponse {
 
 export interface SemanticRepairResponse extends VerifyResponse {
   payment_metadata?: PaymentMetadata | null;
+  /** Actual repaired output from Groq, if a candidate was generated.
+   *  Present for both successful repair AND failed re-validation.
+   *  Null when no candidate was produced (e.g. Groq returned nothing). */
+  repaired_output?: Record<string, unknown> | null;
 }
 
 /**
