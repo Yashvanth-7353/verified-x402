@@ -189,7 +189,7 @@ export function History() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
                     <thead>
                       <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                        {['Outcome', 'Request', 'Receipt', 'Anchoring', 'When'].map((h) => (
+                        {['Outcome', 'Request', 'Repair', 'Receipt', 'Anchoring', 'When'].map((h) => (
                           <th key={h} style={{ padding: '12px 16px', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>
                             {h}
                           </th>
@@ -208,6 +208,15 @@ export function History() {
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <HashChip value={r.request_id} head={8} tail={4} />
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            {r.repair_type ? (
+                              <span className={`badge ${r.repair_type === 'semantic' ? 'badge-accent' : 'badge-pending'}`}>
+                                {r.repair_type}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>
+                            )}
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <HashChip value={r.receipt_hash} head={8} tail={4} />

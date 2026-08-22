@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { semanticRepair as callSemanticRepair, verifyReceipt } from '../api/client';
@@ -52,19 +52,33 @@ export function Result() {
 
   const paymentMeta = response && 'payment_metadata' in response ? response.payment_metadata : null;
 
+  // Log to session only when the receipt ID actually changes (not on initial render).
+  // This prevents logging the intermediate 'rejected' state before payment,
+  // ensuring the session log shows only the final outcome.
+  const initialReceiptIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!state || !response) return;
-    appendSessionEntry({
-      logged_at: new Date().toISOString(),
-      request_id: state.request.request_id,
-      agent_identifier: state.request.agent_identifier,
-      outcome: response.result.outcome,
-      receipt_id: response.receipt.receipt_id,
-      receipt_hash: response.receipt.receipt_hash,
-      had_payment: Boolean(paymentMeta),
-      result: response.result,
-      receipt: response.receipt,
-    });
+    const currentReceiptId = response.receipt.receipt_id;
+    // Skip the first render — we don't want to log the initial (pre-payment) state
+    if (initialReceiptIdRef.current === null) {
+      initialReceiptIdRef.current = currentReceiptId;
+      return;
+    }
+    // Only log when the receipt ID actually changes (e.g., after repair)
+    if (initialReceiptIdRef.current !== currentReceiptId) {
+      initialReceiptIdRef.current = currentReceiptId;
+      appendSessionEntry({
+        logged_at: new Date().toISOString(),
+        request_id: state.request.request_id,
+        agent_identifier: state.request.agent_identifier,
+        outcome: response.result.outcome,
+        receipt_id: currentReceiptId,
+        receipt_hash: response.receipt.receipt_hash,
+        had_payment: Boolean(paymentMeta),
+        result: response.result,
+        receipt: response.receipt,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response?.receipt.receipt_id]);
 

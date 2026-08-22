@@ -88,9 +88,9 @@ export function RecordDetail() {
     );
   }
 
-  // Determine which timeline steps are active
-  const hasRepair = Boolean(record.repair_type && record.repair_type !== 'none');
-  const hasPayment = Boolean(record.payment_status && record.payment_status !== 'none');
+  // All data comes directly from the backend — no frontend inference
+  const hasRepair = record.repair_type != null && record.repair_type !== 'none';
+  const hasPayment = record.payment_status != null && record.payment_status !== 'none';
   const isAnchored = record.anchoring_status === 'anchored';
 
   return (

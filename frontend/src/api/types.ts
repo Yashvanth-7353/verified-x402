@@ -176,6 +176,7 @@ export interface RecordSummary {
   receipt_hash: string;
   output_hash: string | null;
   payment_status: PaymentStatus | null;
+  repair_type: string | null;
   anchoring_status: string;
   merkle_root: string | null;
   anchor_tx_ref: string | null;

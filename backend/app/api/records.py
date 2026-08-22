@@ -31,6 +31,7 @@ class RecordSummary(BaseModel):
     receipt_hash: str
     output_hash: Optional[str] = None
     payment_status: Optional[str] = None
+    repair_type: Optional[str] = None
     anchoring_status: str = "unanchored"
     merkle_root: Optional[str] = None
     anchor_tx_ref: Optional[str] = None
