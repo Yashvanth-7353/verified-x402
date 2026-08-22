@@ -26,21 +26,19 @@ class MockSemanticProvider:
 def get_default_provider() -> SemanticRepairProvider:
     """Return the configured semantic repair provider.
     
-    Uses GroqSemanticProvider when SEMANTIC_REPAIR_PROVIDER=groq and GROQ_API_KEY is set.
-    Falls back to MockSemanticProvider for testing, offline demo, or when Groq is not configured.
+    When SEMANTIC_REPAIR_PROVIDER=groq, GroqSemanticProvider is used and
+    any initialization failure raises immediately (fail-closed).
+    
+    MockSemanticProvider is ONLY used when SEMANTIC_REPAIR_PROVIDER is not 'groq'
+    (e.g., 'mock' or unset) — typically in unit tests and offline demo.
     """
     from app.core.config import settings
     
-    if settings.SEMANTIC_REPAIR_PROVIDER == "groq" and settings.GROQ_API_KEY:
-        try:
-            from app.repair.groq_provider import GroqSemanticProvider
-            return GroqSemanticProvider()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Failed to initialize GroqSemanticProvider (%s); falling back to MockSemanticProvider", e
-            )
-            return MockSemanticProvider()
+    if settings.SEMANTIC_REPAIR_PROVIDER == "groq":
+        # Fail-closed: if groq is configured, we MUST use it.
+        # Any failure (missing key, invalid key, network) raises immediately.
+        from app.repair.groq_provider import GroqSemanticProvider
+        return GroqSemanticProvider()
     return MockSemanticProvider()
 
 
