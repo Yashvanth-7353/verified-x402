@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { WalletProvider as AlgoKitWalletProvider } from '@txnlab/use-wallet-react';
+import { walletManager } from './lib/walletConfig';
 import { Nav } from './components/Nav';
 import { Footer } from './components/Footer';
 import { MeshBackground } from './components/MeshBackground';
@@ -13,6 +15,7 @@ import { History } from './pages/History';
 import { ReceiptVerify } from './pages/ReceiptVerify';
 import { Anchoring } from './pages/Anchoring';
 import { About } from './pages/About';
+import { RecordDetail } from './pages/RecordDetail';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -38,6 +41,7 @@ function AppShell() {
             <Route path="/history" element={<History />} />
             <Route path="/verify-receipt" element={<ReceiptVerify />} />
             <Route path="/anchoring" element={<Anchoring />} />
+            <Route path="/record/:recordId" element={<RecordDetail />} />
             <Route path="/about" element={<About />} />
             <Route path="*" element={<Home />} />
           </Routes>
@@ -53,9 +57,11 @@ function App() {
 
   return (
     <ToastProvider>
-      <HashRouter>
-        <AppShell />
-      </HashRouter>
+      <AlgoKitWalletProvider manager={walletManager}>
+        <HashRouter>
+          <AppShell />
+        </HashRouter>
+      </AlgoKitWalletProvider>
     </ToastProvider>
   );
 }

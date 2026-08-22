@@ -31,6 +31,7 @@ class RecordSummary(BaseModel):
     receipt_hash: str
     output_hash: Optional[str] = None
     payment_status: Optional[str] = None
+    repair_type: Optional[str] = None
     anchoring_status: str = "unanchored"
     merkle_root: Optional[str] = None
     anchor_tx_ref: Optional[str] = None
@@ -77,6 +78,7 @@ def _record_to_summary(row: dict) -> RecordSummary:
 def _record_to_detail(row: dict) -> RecordDetail:
     """Convert a database row to a safe RecordDetail."""
     base = _record_to_summary(row)
+    # repair_type is already in base via RecordSummary.model_dump()
     return RecordDetail(
         **base.model_dump(),
         schema_ref_and_version=row.get("schema_ref_and_version"),
@@ -84,7 +86,6 @@ def _record_to_detail(row: dict) -> RecordDetail:
         signing_key_id=row.get("signing_key_id"),
         signature_algorithm=row.get("signature_algorithm"),
         agent_identifier=row.get("agent_identifier"),
-        repair_type=row.get("repair_type"),
         payment_facilitator=row.get("payment_facilitator"),
         settlement_network=row.get("settlement_network"),
     )
@@ -124,6 +125,33 @@ def list_records(offset: int = 0, limit: int = 50) -> RecordsListResponse:
     except Exception as e:
         logger.exception("Failed to list records")
         raise HTTPException(status_code=500, detail="Failed to retrieve records")
+
+
+@router.get(
+    "/records/unanchored",
+    response_model=RecordsListResponse,
+    summary="List unanchored verification records",
+    description=(
+        "Returns verification records that have not yet been anchored to Algorand. "
+        "These are candidates for Merkle anchoring."
+    ),
+)
+def list_unanchored_records() -> RecordsListResponse:
+    """List records eligible for Merkle anchoring."""
+    try:
+        store = LocalVerificationRecordStore(db_path=settings.resolved_database_path)
+        # Get all records and filter client-side (simple and correct)
+        all_records = store.list_records(offset=0, limit=1000)
+        unanchored = [r for r in all_records if r.get("anchoring_status") == "unanchored"]
+        return RecordsListResponse(
+            records=[_record_to_summary(r) for r in unanchored],
+            total=len(unanchored),
+            offset=0,
+            limit=len(unanchored),
+        )
+    except Exception as e:
+        logger.exception("Failed to list unanchored records")
+        raise HTTPException(status_code=500, detail="Failed to retrieve unanchored records")
 
 
 @router.get(

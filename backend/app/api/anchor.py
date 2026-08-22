@@ -35,12 +35,15 @@ router = APIRouter()
 
 
 class AnchorRequest(BaseModel):
-    """Optional request body to override batch size."""
+    """Request body for anchoring. Supports batch_size or explicit record_ids."""
     batch_size: Optional[int] = None
+    record_ids: Optional[list[str]] = None  # Explicit record IDs to anchor
 
     def model_post_init(self, __context) -> None:
         if self.batch_size is not None and (self.batch_size < 1 or self.batch_size > 1000):
             raise ValueError("batch_size must be between 1 and 1000")
+        if self.record_ids is not None and len(self.record_ids) == 0:
+            raise ValueError("record_ids must not be empty")
 
 
 class AnchorResponse(BaseModel):
@@ -49,6 +52,7 @@ class AnchorResponse(BaseModel):
     leaf_count: int = 0
     merkle_root: Optional[str] = None
     transaction_id: Optional[str] = None
+    record_ids: list[str] = []
     error: Optional[str] = None
 
 
@@ -96,13 +100,16 @@ def anchor_records(payload: AnchorRequest = None) -> AnchorResponse:
             batch_size=batch_size,
         )
 
-        result = service.anchor_pending_records()
+        result = service.anchor_pending_records(
+            record_ids=payload.record_ids if payload and payload.record_ids else None,
+        )
 
         return AnchorResponse(
             status=result.status,
             leaf_count=result.leaf_count,
             merkle_root=result.merkle_root,
             transaction_id=result.transaction_id,
+            record_ids=result.record_ids,
             error=result.error,
         )
 

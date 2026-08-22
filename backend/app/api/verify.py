@@ -47,7 +47,7 @@ def verify(payload: VerifyPayloadRequest) -> VerifyPayloadResponse:
         # Phase 9: Persist the finalized record
         try:
             store = _get_record_store()
-            store.save(result=result, receipt=receipt)
+            store.upsert(result=result, receipt=receipt)
         except Exception:
             logger.exception(
                 "Failed to persist verification record for request_id=%s "

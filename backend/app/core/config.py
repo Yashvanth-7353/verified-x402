@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     AVM_ADDRESS: str = "SOME_ADDRESS_TO_RECEIVE_PAYMENT"
     FACILITATOR_URL: str = "https://facilitator.goplausible.xyz"
     ALGORAND_NETWORK: str = "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
-    SEMANTIC_REPAIR_PRICE: str = "1000000" # 1 ALGO in microAlgos for development
+    SEMANTIC_REPAIR_PRICE: str = "10000" # 0.01 USDC (10000 / 10^6)
 
     # Phase 9: Local Verification Record Store
     DATABASE_PATH: str = ""  # Empty = use default backend/data/verified.db

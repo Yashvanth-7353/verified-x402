@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, Protocol
 
-from app.anchoring.merkle import compute_root, build_merkle_tree, MerkleTree
+from app.anchoring.merkle import compute_root, build_merkle_tree, MerkleTree, is_valid_receipt_hash
 from app.storage.store import LocalVerificationRecordStore, LocalVerificationRecord
 
 logger = logging.getLogger(__name__)
@@ -176,26 +176,50 @@ class MerkleAnchoringService:
         self._batch_size = batch_size
         self._lock = threading.Lock()
 
-    def anchor_pending_records(self) -> AnchorResult:
+    def anchor_pending_records(self, record_ids: Optional[list[str]] = None) -> AnchorResult:
         """
         Select unanchored records, build Merkle tree, anchor to Algorand.
 
         This is the main entry point for the anchoring trigger.
         Can be called manually or by a future scheduler.
 
+        Args:
+            record_ids: Optional list of specific record IDs to anchor.
+                       If provided, only these unanchored records are included.
+                       If None, up to batch_size unanchored records are selected.
+
         Returns:
             AnchorResult with the outcome of the anchoring operation.
         """
         with self._lock:
-            return self._do_anchor()
+            return self._do_anchor(record_ids)
 
-    def _do_anchor(self) -> AnchorResult:
+    def _do_anchor(self, record_ids: Optional[list[str]] = None) -> AnchorResult:
         """Internal anchoring implementation (must be called under lock)."""
         start_time = datetime.now(timezone.utc)
 
         # 1. Select unanchored records
         all_unanchored = self._store.list_unanchored_records()
-        batch = all_unanchored[: self._batch_size]
+
+        if record_ids is not None:
+            # Filter to only the requested records that are still unanchored
+            id_set = set(record_ids)
+            batch = [r for r in all_unanchored if str(r.record_id) in id_set]
+        else:
+            batch = all_unanchored[: self._batch_size]
+
+        # Validate receipt hashes — reject batch if any are invalid
+        invalid = [r for r in batch if not is_valid_receipt_hash(r.receipt_hash)]
+        if invalid:
+            invalid_ids = [str(r.record_id) for r in invalid]
+            logger.error(
+                "Anchor batch contains %d records with invalid receipt hashes: %s",
+                len(invalid), invalid_ids[:5],
+            )
+            return AnchorResult(
+                status="failed",
+                error=f"{len(invalid)} record(s) have invalid receipt hashes and cannot be anchored: {', '.join(invalid_ids[:5])}",
+            )
 
         if not batch:
             logger.info("No unanchored records to anchor")

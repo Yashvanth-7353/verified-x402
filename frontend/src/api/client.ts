@@ -30,8 +30,13 @@ function decodeChallenge(res: Response): PaymentRequiredChallenge | undefined {
   }
 }
 
+/**
+ * Base URL for API calls. When VITE_API_BASE_URL is not set, uses empty
+ * string (relative) so the Vite dev server proxy forwards /api/* to the
+ * backend. In production, set VITE_API_BASE_URL to the backend origin.
+ */
 export const API_BASE: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
 async function parseJson(res: Response): Promise<unknown> {
   const text = await res.text();
@@ -104,11 +109,18 @@ export function semanticRepair(
   });
 }
 
-export function triggerAnchor(batchSize?: number): Promise<AnchorResponse> {
+export function triggerAnchor(batchSize?: number, recordIds?: string[]): Promise<AnchorResponse> {
   return request('/api/v1/anchor', {
     method: 'POST',
-    body: JSON.stringify(batchSize ? { batch_size: batchSize } : {}),
+    body: JSON.stringify({
+      ...(batchSize ? { batch_size: batchSize } : {}),
+      ...(recordIds && recordIds.length > 0 ? { record_ids: recordIds } : {}),
+    }),
   });
+}
+
+export function listUnanchoredRecords(): Promise<RecordsListResponse> {
+  return request('/api/v1/records/unanchored');
 }
 
 export function verifyReceipt(receipt: VerificationReceipt): Promise<ReceiptVerifyResponse> {
@@ -126,6 +138,10 @@ export function publicKey(): Promise<PublicKeyResponse> {
 
 export function listRecords(offset = 0, limit = 50): Promise<RecordsListResponse> {
   return request(`/api/v1/records?offset=${offset}&limit=${limit}`);
+}
+
+export function getRecord(recordId: string): Promise<RecordSummary & { schema_ref_and_version?: string | null; validator_version?: string | null; signing_key_id?: string | null; signature_algorithm?: string | null; agent_identifier?: string | null; repair_type?: string | null; payment_facilitator?: string | null; settlement_network?: string | null }> {
+  return request(`/api/v1/records/${recordId}`);
 }
 
 // ---- Phase 15: Merkle inclusion proof ----

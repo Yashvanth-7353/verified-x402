@@ -1,21 +1,27 @@
 /**
- * Curated example payloads that exercise real backend code paths — verified
- * against backend/app/validation/stages/schema.py and
- * backend/app/repair/{deterministic,semantic}.py:
+ * Four curated example payloads that exercise distinct real backend code paths.
  *
- * - "clean": passes schema validation as-is → verified.
- * - "defaulted": omits a field the schema declares a `default` for → the
- *   deterministic repair engine fills it in (schema_defaults rule) → verified_repaired.
- * - "needsRepair": omits a required field with no schema default, and — because
- *   the semantic-repair endpoint's MockSemanticProvider (the MVP provider) looks
- *   for an `inject_mock_semantic_repair` key — is only fixable through the
- *   payment-gated /semantic-repair escalation.
+ * All examples are INPUT-ONLY. The backend determines the actual result.
+ * No operational output is mocked or hardcoded.
+ *
+ * - "clean": all fields present and correct types → verified.
+ * - "missingField": omits a required field with no schema default —
+ *   deterministic repair can't help, escalation to /semantic-repair
+ *   triggers x402 payment → Groq → re-validation.
+ * - "typeCorrection": "age" is a string ("25") instead of integer (25) —
+ *   type mismatch detected by schema validation, semantic repair may fix.
+ * - "unrepairable": multiple incompatible values — demonstrates the system
+ *   does not blindly trust the LLM.
  */
 
 export interface Example {
   id: string;
   label: string;
   description: string;
+  /** Short hint shown on the example card */
+  hint: string;
+  /** Visual indicator: checkmark, warning, or cross */
+  indicator: 'pass' | 'warn' | 'fail';
   outputType: 'json';
   schemaRef: string;
   schemaVersion: string;
@@ -23,60 +29,87 @@ export interface Example {
   payload: Record<string, unknown>;
 }
 
+const PERSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    email: { type: 'string' },
+    age: { type: 'integer' },
+    country: { type: 'string' },
+  },
+  required: ['name', 'email', 'age', 'country'],
+};
+
 export const EXAMPLES: Example[] = [
   {
     id: 'clean',
-    label: 'Clean output',
-    description: 'Matches its schema exactly — passes on the first local pass, no repair needed.',
+    label: 'Clean Output',
+    hint: 'Already satisfies the schema',
+    description:
+      'A valid structured output with all required fields and correct types. Should pass validation on the first local pass with no repair needed.',
+    indicator: 'pass',
     outputType: 'json',
-    schemaRef: 'invoice.v1',
+    schemaRef: 'person.v1',
     schemaVersion: '1.0',
-    schemaDefinition: {
-      type: 'object',
-      properties: {
-        customer: { type: 'string' },
-        amount_usd: { type: 'number' },
-      },
-      required: ['customer', 'amount_usd'],
-    },
-    payload: { customer: 'Acme Robotics', amount_usd: 480 },
-  },
-  {
-    id: 'defaulted',
-    label: 'Missing field with a schema default',
-    description: 'Omits "status", which the schema declares a default for — deterministic repair fills it, no payment.',
-    outputType: 'json',
-    schemaRef: 'invoice.v1',
-    schemaVersion: '1.0',
-    schemaDefinition: {
-      type: 'object',
-      properties: {
-        customer: { type: 'string' },
-        amount_usd: { type: 'number' },
-        status: { type: 'string', default: 'pending' },
-      },
-      required: ['customer', 'amount_usd', 'status'],
-    },
-    payload: { customer: 'Acme Robotics', amount_usd: 480 },
-  },
-  {
-    id: 'needsRepair',
-    label: 'Requires semantic repair',
-    description: 'Missing "amount_usd" with no default — deterministic repair can\'t help. Needs the paid semantic-repair escalation.',
-    outputType: 'json',
-    schemaRef: 'invoice.v1',
-    schemaVersion: '1.0',
-    schemaDefinition: {
-      type: 'object',
-      properties: {
-        customer: { type: 'string' },
-        amount_usd: { type: 'number' },
-      },
-      required: ['customer', 'amount_usd'],
-    },
+    schemaDefinition: PERSON_SCHEMA,
     payload: {
-      customer: 'Acme Robotics',
-      inject_mock_semantic_repair: { amount_usd: 480 },
+      name: 'Alice',
+      email: 'alice@example.com',
+      age: 28,
+      country: 'India',
+    },
+  },
+  {
+    id: 'missingField',
+    label: 'Missing Required Field',
+    hint: 'Missing age — demonstrates paid semantic repair',
+    description:
+      'The "age" field is omitted and the schema declares no default for it. Deterministic repair cannot fill it — escalation to semantic repair (x402 payment → Groq → re-validation) is required.',
+    indicator: 'warn',
+    outputType: 'json',
+    schemaRef: 'person.v1',
+    schemaVersion: '1.0',
+    schemaDefinition: PERSON_SCHEMA,
+    payload: {
+      name: 'Bob',
+      email: 'bob@example.com',
+      country: 'India',
+    },
+  },
+  {
+    id: 'typeCorrection',
+    label: 'Type Correction',
+    hint: 'age has the wrong type — demonstrates semantic repair',
+    description:
+      '"age" is a string ("25") instead of an integer (25). Schema validation detects the type mismatch. Semantic repair via Groq may produce a corrected candidate that is then re-validated.',
+    indicator: 'warn',
+    outputType: 'json',
+    schemaRef: 'person.v1',
+    schemaVersion: '1.0',
+    schemaDefinition: PERSON_SCHEMA,
+    payload: {
+      name: 'Charlie',
+      email: 'charlie@example.com',
+      age: '25',
+      country: 'India',
+    },
+  },
+  {
+    id: 'unrepairable',
+    label: 'Unrepairable Output',
+    hint: 'Multiple incompatible values — demonstrates rejection',
+    description:
+      'Contains multiple severe type violations: numeric name, non-email string, string age, and null country. Designed to demonstrate that the system does not blindly accept LLM-generated repairs.',
+    indicator: 'fail',
+    outputType: 'json',
+    schemaRef: 'person.v1',
+    schemaVersion: '1.0',
+    schemaDefinition: PERSON_SCHEMA,
+    payload: {
+      name: 12345,
+      email: 'not-an-email',
+      age: 'unknown',
+      country: null,
     },
   },
 ];

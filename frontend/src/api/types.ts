@@ -91,6 +91,10 @@ export interface VerifyResponse {
 
 export interface SemanticRepairResponse extends VerifyResponse {
   payment_metadata?: PaymentMetadata | null;
+  /** Actual repaired output from Groq, if a candidate was generated.
+   *  Present for both successful repair AND failed re-validation.
+   *  Null when no candidate was produced (e.g. Groq returned nothing). */
+  repaired_output?: Record<string, unknown> | null;
 }
 
 /**
@@ -123,6 +127,7 @@ export interface AnchorResponse {
   leaf_count: number;
   merkle_root: string | null;
   transaction_id: string | null;
+  record_ids: string[];
   error: string | null;
 }
 
@@ -172,6 +177,7 @@ export interface RecordSummary {
   receipt_hash: string;
   output_hash: string | null;
   payment_status: PaymentStatus | null;
+  repair_type: string | null;
   anchoring_status: string;
   merkle_root: string | null;
   anchor_tx_ref: string | null;

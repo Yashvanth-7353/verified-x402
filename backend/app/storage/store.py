@@ -293,6 +293,110 @@ class LocalVerificationRecordStore:
                 f"request_id={record.request_id} already exists with a different receipt_id"
             ) from e
 
+    def upsert(
+        self,
+        result: VerificationResult,
+        receipt: VerificationReceipt,
+        payment_metadata: Optional[PaymentMetadata] = None,
+    ) -> LocalVerificationRecord:
+        """
+        Insert or update a verification record.
+
+        If a record with the same request_id already exists (e.g., from
+        an initial /verify call), UPDATE it with the final result (e.g.,
+        from a successful /semantic-repair call). This ensures the
+        database always reflects the final verification lifecycle state.
+
+        If no record exists, INSERT a new one.
+        """
+        request_id = str(receipt.request_id_ref)
+        outcome = receipt.outcome.value
+
+        conn = self._get_conn()
+
+        existing = self.get_by_request_id(request_id)
+        if existing is not None:
+            # UPDATE the existing record with the final state
+            conn.execute(
+                """
+                UPDATE local_verification_records
+                SET outcome = ?,
+                    receipt_id = ?,
+                    receipt_hash = ?,
+                    output_hash = ?,
+                    receipt_json = ?,
+                    result_json = ?,
+                    payment_metadata_json = ?
+                WHERE request_id = ?
+                """,
+                (
+                    outcome,
+                    str(receipt.receipt_id),
+                    receipt.receipt_hash,
+                    receipt.output_hash,
+                    _serialize_model(receipt),
+                    _serialize_model(result),
+                    _serialize_model(payment_metadata) if payment_metadata else None,
+                    request_id,
+                ),
+            )
+            conn.commit()
+            logger.info(
+                "Record UPDATED: request_id=%s outcome=%s receipt_id=%s",
+                request_id, outcome, str(receipt.receipt_id),
+            )
+            # Return the updated record
+            updated = self.get_by_request_id(request_id)
+            assert updated is not None
+            return updated
+
+        # No existing record — INSERT new
+        record = LocalVerificationRecord(
+            record_id=uuid4(),
+            request_id=request_id,
+            receipt_id=str(receipt.receipt_id),
+            outcome=outcome,
+            receipt_hash=receipt.receipt_hash,
+            output_hash=receipt.output_hash,
+            receipt_json=_serialize_model(receipt),
+            result_json=_serialize_model(result),
+            payment_metadata_json=_serialize_model(payment_metadata) if payment_metadata else None,
+            anchoring_status=AnchoringStatus.unanchored,
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        conn.execute(
+            """
+            INSERT INTO local_verification_records
+            (record_id, request_id, receipt_id, outcome, receipt_hash,
+             output_hash, receipt_json, result_json, payment_metadata_json,
+             anchoring_status, merkle_inclusion_ref, anchor_tx_ref, merkle_root,
+             created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(record.record_id),
+                record.request_id,
+                record.receipt_id,
+                record.outcome,
+                record.receipt_hash,
+                record.output_hash,
+                record.receipt_json,
+                record.result_json,
+                record.payment_metadata_json,
+                record.anchoring_status.value,
+                record.merkle_inclusion_ref,
+                record.anchor_tx_ref,
+                record.merkle_root,
+                record.created_at,
+            ),
+        )
+        conn.commit()
+        logger.info(
+            "Record CREATED: request_id=%s outcome=%s receipt_id=%s",
+            request_id, outcome, record.receipt_id,
+        )
+        return record
+
     def get_by_request_id(self, request_id: str) -> Optional[LocalVerificationRecord]:
         """
         Retrieve a record by its request_id.
