@@ -38,6 +38,7 @@ export function Result() {
 
   const [response, setResponse] = useState<VerifyResponse | SemanticRepairResponse | undefined>(state?.response);
   const [escalating, setEscalating] = useState(false);
+  const [escalationAttempted, setEscalationAttempted] = useState(false);
   const [challenge, setChallenge] = useState<PaymentRequiredChallenge | null>(null);
   const [escalationError, setEscalationError] = useState<string | null>(null);
 
@@ -71,33 +72,35 @@ export function Result() {
     if (!response) return [];
     const hasRepair = Boolean(response.result.repair_info);
     const isSemanticRepair = response.result.repair_info?.repair_type === 'semantic';
+    const isRejected = response.result.outcome === 'rejected';
+    const isPaid = paymentMeta?.payment_status === 'settled';
+
+    // Escalation stage: show if user requested semantic repair or it was attempted
+    const showEscalation = escalationAttempted || escalating || isSemanticRepair || isPaid || (isRejected && challenge != null);
+    const escalatedState: Stage['state'] = escalating ? 'active' : showEscalation ? 'done' : 'skipped';
+
+    // Paid stage: show only when semantic repair path was entered
+    const paidState: Stage['state'] = isPaid ? 'done' : escalating ? 'active' : challenge ? 'pending' : 'skipped';
+
+    // Repair stage: show when backend reports a repair was performed
+    const repairedState: Stage['state'] = hasRepair ? 'done' : (isPaid && !isRejected) ? 'active' : 'skipped';
+
+    // Re-validation stage: show when repair occurred and was accepted
+    const revalidatedState: Stage['state'] = hasRepair ? 'done' : 'skipped';
+
+    // Receipt stage: backend always generates a receipt (even for rejected)
+    const receiptState: Stage['state'] = 'done';
+
     return [
       { key: 'submitted', label: 'Submitted', state: 'done' },
       { key: 'validated', label: 'Validated', state: 'done' },
-      {
-        key: 'escalated',
-        label: 'Escalated',
-        state: !isSemanticRepair && !challenge && !escalating ? 'skipped' : escalating ? 'active' : 'done',
-      },
-      {
-        key: 'paid',
-        label: 'Paid',
-        state:
-          !isSemanticRepair && !challenge
-            ? 'skipped'
-            : paymentMeta?.payment_status === 'settled'
-              ? 'done'
-              : challenge
-                ? 'pending'
-                : escalating
-                  ? 'active'
-                  : 'skipped',
-      },
-      { key: 'repaired', label: 'Repaired', state: hasRepair ? 'done' : 'skipped' },
-      { key: 'revalidated', label: 'Re-validated', state: hasRepair ? 'done' : 'skipped' },
-      { key: 'receipt', label: 'Receipt', state: response.result.outcome === 'rejected' ? 'failed' : 'done' },
+      { key: 'escalated', label: 'Escalated', state: escalatedState },
+      { key: 'paid', label: 'Paid', state: paidState },
+      { key: 'repaired', label: 'Repaired', state: repairedState },
+      { key: 'revalidated', label: 'Re-validated', state: revalidatedState },
+      { key: 'receipt', label: 'Receipt', state: receiptState },
     ];
-  }, [response, challenge, escalating, paymentMeta]);
+  }, [response, challenge, escalating, escalationAttempted, paymentMeta]);
 
   if (!state || !response) {
     return (
@@ -121,6 +124,7 @@ export function Result() {
 
   const onEscalate = async () => {
     setEscalating(true);
+    setEscalationAttempted(true);
     setEscalationError(null);
     setChallenge(null);
     setPaymentState('idle');
@@ -206,9 +210,10 @@ export function Result() {
     }
   };
 
-  const canEscalate = response.result.outcome === 'rejected' && !challenge;
+  const canEscalate = response.result.outcome === 'rejected' && !challenge && !escalationAttempted;
   const semanticProvider = response.result.repair_info?.semantic_repair_provider_ref;
   const showPaymentFlow = Boolean(challenge) && !paymentMeta;
+  const wasPaidButFailed = paymentMeta?.payment_status === 'settled' && response.result.outcome === 'rejected' && !response.result.repair_info;
 
   return (
     <div className="page">
@@ -233,6 +238,11 @@ export function Result() {
         <div className="card card-pad" style={{ margin: '24px 0' }}>
           <div className="section-title">Verification pipeline</div>
           <PipelineStages stages={stages} />
+          {wasPaidButFailed && (
+            <p style={{ fontSize: 12.5, color: 'var(--warning)', marginTop: 12 }}>
+              Payment was settled on Algorand TestNet, but the semantic-repair provider could not produce a valid candidate. The output remains rejected.
+            </p>
+          )}
         </div>
 
         <div className="stagger-children" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
