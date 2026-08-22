@@ -10,7 +10,6 @@
  */
 import { x402Client } from '@x402/core/client';
 import { ExactAvmScheme } from '@x402/avm/exact/client';
-import { ALGORAND_TESTNET_CAIP2 } from '@x402/avm';
 
 import type { ClientAvmSigner } from '@x402/avm/exact/client';
 import type { PaymentRequired } from '@x402/core';
@@ -46,6 +45,10 @@ export function parsePaymentRequired(
 /**
  * Create a signed x402 payment payload using the wallet signer.
  * Returns the base64-encoded PAYMENT-SIGNATURE header value.
+ *
+ * IMPORTANT: We register the ExactAvmScheme using the ACTUAL network string
+ * from the payment requirements (not ALGORAND_TESTNET_CAIP2 from the library,
+ * which may be truncated in @x402/avm v2.23.0).
  */
 export async function createSignedPayment(
   paymentRequired: PaymentRequired,
@@ -53,8 +56,15 @@ export async function createSignedPayment(
 ): Promise<string> {
   const client = new x402Client();
 
+  // Get the actual network from the payment requirements — NOT from the
+  // library constant ALGORAND_TESTNET_CAIP2 which may be truncated.
+  const network = paymentRequired.accepts?.[0]?.network;
+  if (!network) {
+    throw new Error('No network found in payment requirements');
+  }
+
   const scheme = new ExactAvmScheme(walletSigner);
-  client.register(ALGORAND_TESTNET_CAIP2, scheme);
+  client.register(network, scheme);
 
   const payload = await client.createPaymentPayload(paymentRequired);
 
