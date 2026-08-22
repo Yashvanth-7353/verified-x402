@@ -5,7 +5,7 @@ import { Logo } from './Logo';
 import { MenuIcon, XIcon } from './icons';
 
 const LINKS = [
-  { to: '/', label: 'Dashboard', end: true },
+  { to: '/', label: 'Dashboard' },
   { to: '/verify', label: 'Verify' },
   { to: '/history', label: 'History' },
   { to: '/anchoring', label: 'Anchoring' },
@@ -19,7 +19,9 @@ function truncateAddr(addr: string): string {
 }
 
 function isLinkActive(pathname: string, link: (typeof LINKS)[number]): boolean {
-  return link.end ? pathname === link.to : pathname.startsWith(link.to);
+  // Use exact matching for all routes to avoid prefix collisions
+  // (e.g., /verify would incorrectly match /verify-receipt)
+  return pathname === link.to;
 }
 
 export function Nav() {
