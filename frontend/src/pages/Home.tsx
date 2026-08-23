@@ -278,23 +278,21 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---------- Feature rows ---------- */}
-      <section className="container">
-        <div className="feature-timeline">
+      {/* ---------- Invariants: compact 3-up grid, no stacked scroll ---------- */}
+      <section className="container" style={{ marginBottom: 56 }}>
+        <Reveal>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Invariants</div>
+        </Reveal>
+        <div className="invariant-grid">
           {FEATURES.map((f, i) => (
-            <div className={`feature-row ${i % 2 ? 'reverse' : ''}`} key={f.title} style={{ position: 'relative' }}>
-              <Reveal variant={i % 2 ? 'right' : 'left'}>
-                <div style={{ position: 'relative' }}>
-                  <div className="feature-number">0{i + 1}</div>
-                  <span className="eyebrow">{f.eyebrow}</span>
-                  <h2 style={{ fontSize: 'var(--fs-xl)', margin: '10px 0 12px' }}>{f.title}</h2>
-                  <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', maxWidth: 460 }}>{f.body}</p>
-                </div>
-              </Reveal>
-              <Reveal variant="scale" delay={100}>
+            <Reveal key={f.title} delay={i * 80}>
+              <div className="card glass card-pad invariant-card">
                 <FeatureVisual kind={f.visual} />
-              </Reveal>
-            </div>
+                <div className="invariant-number mono">{f.eyebrow}</div>
+                <h2 style={{ fontSize: 'var(--fs-lg)', margin: '8px 0 8px' }}>{f.title}</h2>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{f.body}</p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>

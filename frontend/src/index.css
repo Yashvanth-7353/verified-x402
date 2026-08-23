@@ -1684,25 +1684,6 @@ details.tech[open] summary {
   position: relative;
 }
 
-/* ---------- feature row (varied layout) ---------- */
-
-.feature-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 28px;
-  align-items: center;
-  padding: 56px 0;
-}
-
-@media (min-width: 860px) {
-  .feature-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .feature-row.reverse .feature-visual {
-    order: 2;
-  }
-}
-
 .feature-visual {
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
@@ -1711,6 +1692,42 @@ details.tech[open] summary {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Invariants: compact 3-up grid replacing the old full-width stacked rows */
+.invariant-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 860px) {
+  .invariant-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.invariant-card {
+  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.invariant-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+
+.invariant-card .feature-visual {
+  aspect-ratio: unset;
+  height: 128px;
+  margin-bottom: 16px;
+}
+
+.invariant-number {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
 .feature-visual::after {
@@ -2043,37 +2060,6 @@ details.tech[open] summary {
 @keyframes border-shimmer {
   0% { background-position: 0% 50%; }
   100% { background-position: 200% 50%; }
-}
-
-/* 5. Feature timeline connector */
-.feature-timeline {
-  position: relative;
-  padding-left: 24px;
-}
-
-.feature-timeline::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  background-image: linear-gradient(to bottom, var(--border-strong) 50%, transparent 50%);
-  background-size: 2px 8px;
-  background-repeat: repeat-y;
-}
-
-/* 6. Feature number */
-.feature-number {
-  font-family: var(--display);
-  font-size: 64px;
-  font-weight: 700;
-  color: var(--border);
-  opacity: 0.4;
-  position: absolute;
-  left: -40px;
-  top: -20px;
-  z-index: -1;
 }
 
 /* 7. Pipeline connection line */
