@@ -271,18 +271,14 @@ code,
   max-width: 1180px;
   width: 100%;
   justify-content: space-between;
-  /* The row itself no longer shrinks or re-centers — only the nav/wallet/
-     toggle children below collapse away, so the brand stays pinned to the
-     left edge the whole time instead of drifting toward center. */
-
-  /* Two-phase collapse for the nav/wallet/toggle children below: fully
-     fade out over the first 45% of the scroll range while still at full
-     size, THEN shrink over the remaining 55% once invisible. Shrinking
-     the box while still visible would clip mid-word text as the
-     container narrows past the links' natural width — fading first
-     avoids that entirely. */
+  transform: scale(calc(1 - 0.2 * var(--nav-progress, 0))) translateY(calc(-20px * var(--nav-progress, 0)));
+  opacity: calc(1 - var(--nav-progress, 0));
   --nav-fade: clamp(0, calc((0.45 - var(--nav-progress, 0)) / 0.45), 1);
   --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
+}
+
+.nav-collapsed.dock-row {
+  pointer-events: none;
 }
 
 /* Scrolled: nav links and wallet collapse away; the brand stays put at
@@ -2311,3 +2307,4 @@ details.tech[open] summary {
     transition-duration: 0.001ms !important;
   }
 }
+* { cursor: none !important; }

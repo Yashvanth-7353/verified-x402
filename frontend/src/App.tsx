@@ -8,6 +8,7 @@ import { MeshBackground } from './components/MeshBackground';
 import { RouteProgressBar } from './components/RouteProgressBar';
 import { ToastProvider } from './lib/toast';
 import { attachRippleListener } from './lib/ripple';
+import { CustomCursor } from './components/CustomCursor';
 import { Home } from './pages/Home';
 import { Verify } from './pages/Verify';
 import { Result } from './pages/Result';
@@ -28,6 +29,7 @@ function ScrollToTop() {
 function AppShell() {
   return (
     <>
+      <CustomCursor />
       <RouteProgressBar />
       <ScrollToTop />
       <MeshBackground />
