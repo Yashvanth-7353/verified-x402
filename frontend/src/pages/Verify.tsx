@@ -26,8 +26,8 @@ export function Verify() {
   const [schemaRef, setSchemaRef] = useState('invoice.v1');
   const [schemaVersion, setSchemaVersion] = useState('1.0');
   const [privacyPolicyRef, setPrivacyPolicyRef] = useState('default');
-  const [payloadText, setPayloadText] = useState(JSON.stringify(EXAMPLES[0].payload, null, 2));
-  const [schemaText, setSchemaText] = useState(JSON.stringify(EXAMPLES[0].schemaDefinition, null, 2));
+  const [payloadText, setPayloadText] = useState(() => JSON.stringify(EXAMPLES[0].payload, null, 2));
+  const [schemaText, setSchemaText] = useState(() => JSON.stringify(EXAMPLES[0].schemaDefinition, null, 2));
   const [showPolicy, setShowPolicy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -8,11 +8,15 @@ export interface TypeSegment {
 const reducedMotion =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-/** Types out one or more styled segments in sequence, with a blinking caret. */
+/** Types out one or more styled segments in sequence, with a blinking caret.
+ *  The whole animation (startDelay + typing) is capped at `maxDuration` —
+ *  `speed` is a per-char upper bound that gets scaled down for longer text
+ *  so it never runs past the cap. */
 export function Typewriter({
   segments,
   speed = 32,
   startDelay = 200,
+  maxDuration = 1500,
   as: Tag = 'span',
   className = '',
   onDone,
@@ -20,6 +24,7 @@ export function Typewriter({
   segments: TypeSegment[];
   speed?: number;
   startDelay?: number;
+  maxDuration?: number;
   as?: 'span' | 'h1' | 'h2' | 'p';
   className?: string;
   onDone?: () => void;
@@ -33,6 +38,9 @@ export function Typewriter({
     let i = 0;
     let timer: ReturnType<typeof setTimeout>;
 
+    const typingBudget = Math.max(0, maxDuration - startDelay);
+    const effectiveSpeed = full.length > 0 ? Math.min(speed, typingBudget / full.length) : speed;
+
     const tick = () => {
       i += 1;
       setCount(i);
@@ -41,7 +49,7 @@ export function Typewriter({
         onDone?.();
         return;
       }
-      timer = setTimeout(tick, speed);
+      timer = setTimeout(tick, effectiveSpeed);
     };
 
     const startTimer = setTimeout(tick, startDelay);
@@ -51,7 +59,7 @@ export function Typewriter({
     };
     // Re-run only if the target text actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [full, speed, startDelay]);
+  }, [full, speed, startDelay, maxDuration]);
 
   const { nodes: rendered } = segments.reduce<{ nodes: ReactNode[]; remaining: number }>(
     (acc, seg, i) => {

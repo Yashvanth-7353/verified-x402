@@ -121,7 +121,6 @@ export function Anchoring() {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [allSelected, setAllSelected] = useState(false);
 
   // Anchor state
   const [anchorRunning, setAnchorRunning] = useState(false);
@@ -182,6 +181,7 @@ export function Anchoring() {
   }, []);
 
   const unanchored = allRecords.filter((r) => r.anchoring_status === 'unanchored');
+  const allSelected = unanchored.length > 0 && selectedIds.size === unanchored.length;
 
   // Selection handlers
   const toggleSelect = (id: string) => {
@@ -189,19 +189,16 @@ export function Anchoring() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      setAllSelected(next.size === unanchored.length && unanchored.length > 0);
       return next;
     });
   };
 
   const selectAll = () => {
     setSelectedIds(new Set(unanchored.map((r) => r.record_id)));
-    setAllSelected(true);
   };
 
   const clearSelection = () => {
     setSelectedIds(new Set());
-    setAllSelected(false);
   };
 
   const selectedCount = selectedIds.size;
@@ -228,7 +225,6 @@ export function Anchoring() {
       // Refresh records after anchoring
       await refreshRecords();
       setSelectedIds(new Set());
-      setAllSelected(false);
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
         setNotConfigured(true);

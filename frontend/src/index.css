@@ -267,13 +267,14 @@ code,
 .dock-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: 1180px;
+  gap: calc(10px - 4px * var(--nav-progress, 0));
+  /* The dock narrows horizontally as the page scrolls (maximized at the
+     top, minimized once fully scrolled) and widens back out on the way
+     back up — driven continuously by --nav-progress, no discrete jump. */
+  max-width: calc(1180px - 520px * var(--nav-progress, 0));
   width: 100%;
   justify-content: space-between;
-  /* The row itself never fades or shrinks — only the nav/wallet/toggle
-     children below collapse away, so the brand stays visible and pinned
-     to the left edge for the entire scroll range. */
+  margin: 0 auto;
   --nav-fade: clamp(0, calc((0.45 - var(--nav-progress, 0)) / 0.45), 1);
   --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
 }
@@ -316,7 +317,11 @@ code,
   font-family: var(--grotesk);
   font-weight: 700;
   font-size: 17px;
-  margin-left: 8px;
+  margin-left: calc(8px * (1 - var(--nav-shrink, 0)));
+  max-width: calc(140px * (1 - var(--nav-shrink, 0)));
+  opacity: calc(1 - var(--nav-shrink, 0));
+  overflow: hidden;
+  white-space: nowrap;
   letter-spacing: -0.01em;
   color: var(--text);
 }
@@ -330,10 +335,10 @@ code,
   position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px - 2px * var(--nav-shrink, 0));
   border-radius: 999px;
-  padding: 6px;
-  transition: padding 380ms var(--ease), gap 380ms var(--ease), box-shadow 260ms var(--ease), background 260ms var(--ease);
+  padding: calc(6px - 2px * var(--nav-shrink, 0));
+  transition: box-shadow 260ms var(--ease), background 260ms var(--ease);
 }
 
 .dock-pill {
@@ -366,14 +371,14 @@ code,
 .dock-link {
   position: relative;
   z-index: 1;
-  padding: 9px 16px;
+  padding: 9px calc(16px - 6px * var(--nav-shrink, 0));
   border-radius: 999px;
-  font-size: 13px;
+  font-size: calc(13px - 1px * var(--nav-shrink, 0));
   font-weight: 600;
   text-decoration: none;
   color: var(--text-muted);
   white-space: nowrap;
-  transition: color 260ms var(--ease), background 260ms var(--ease), padding 380ms var(--ease), font-size 380ms var(--ease);
+  transition: color 260ms var(--ease), background 260ms var(--ease);
 }
 
 .dock-link:hover {

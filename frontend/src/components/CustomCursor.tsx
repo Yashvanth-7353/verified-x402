@@ -37,8 +37,8 @@ export function CustomCursor() {
       }
 
       // Outer cursor trails slightly
-      trailed.current.x += (mouse.current.x - trailed.current.x) * 0.2;
-      trailed.current.y += (mouse.current.y - trailed.current.y) * 0.2;
+      trailed.current.x += (mouse.current.x - trailed.current.x) * 0.35;
+      trailed.current.y += (mouse.current.y - trailed.current.y) * 0.35;
 
       if (outerRef.current) {
         outerRef.current.style.transform = `translate3d(${trailed.current.x}px, ${trailed.current.y}px, 0)`;
@@ -72,7 +72,8 @@ export function CustomCursor() {
           backgroundColor: hovered ? 'var(--seal)' : 'var(--accent)',
           pointerEvents: 'none',
           zIndex: 9999,
-          transition: 'background-color 0.3s ease, transform 0.1s ease',
+          willChange: 'transform',
+          transition: 'background-color 0.3s ease',
           mixBlendMode: 'difference',
         }}
       />

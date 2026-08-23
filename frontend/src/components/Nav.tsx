@@ -175,7 +175,18 @@ export function Nav() {
                 }}
               >
                 <span className="status-dot live" style={{ width: 6, height: 6 }} />
-                <span style={{ fontSize: 12 }}>{truncateAddr(activeAddress)}</span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    maxWidth: 'calc(90px * (1 - var(--nav-shrink, 0)))',
+                    opacity: 'calc(1 - var(--nav-shrink, 0))',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                  }}
+                >
+                  {truncateAddr(activeAddress)}
+                </span>
               </button>
               {walletMenuOpen && (
                 <div
