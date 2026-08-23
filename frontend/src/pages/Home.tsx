@@ -7,6 +7,7 @@ import { useParallax } from '../lib/useReveal';
 import { useTilt } from '../lib/useTilt';
 import { loadSessionLog } from '../lib/session';
 import { relativeTime } from '../lib/format';
+import { BoltIcon, PackageIcon, LinkIcon, PlugIcon, ClipboardIcon } from '../components/icons';
 
 const STEPS = [
   { title: 'Validate', body: 'Schema, type, syntax, SQL-safety and privacy checks run locally — nothing leaves the device yet.' },
@@ -38,11 +39,11 @@ const FEATURES = [
 ];
 
 const USE_CASES = [
-  { icon: '⚡', title: 'AI Financial Agent', body: 'Validates payment instructions before execution.' },
-  { icon: '📦', title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.' },
-  { icon: '🔗', title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.' },
-  { icon: '🔌', title: 'AI API Execution', body: 'Validates API requests before they are sent.' },
-  { icon: '📋', title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.' },
+  { icon: BoltIcon, title: 'AI Financial Agent', body: 'Validates payment instructions before execution.' },
+  { icon: PackageIcon, title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.' },
+  { icon: LinkIcon, title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.' },
+  { icon: PlugIcon, title: 'AI API Execution', body: 'Validates API requests before they are sent.' },
+  { icon: ClipboardIcon, title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.' },
 ];
 
 const TECH = [
@@ -284,20 +285,20 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---------- Technology stack ---------- */}
-      <section className="container" style={{ marginBottom: 56 }}>
+      {/* ---------- Technology stack: auto-scrolling marquee ---------- */}
+      <section style={{ marginBottom: 56 }}>
         <Reveal>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Built with</div>
+          <div className="eyebrow container" style={{ marginBottom: 10 }}>Built with</div>
         </Reveal>
-        <div className="snap-strip">
-          {TECH.map((t, i) => (
-            <Reveal key={t.label} delay={i * 50}>
-              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }}>
+        <div className="marquee">
+          <div className="marquee-track">
+            {[...TECH, ...TECH].map((t, i) => (
+              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }} key={`${t.label}-${i}`}>
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--grotesk)' }}>{t.label}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>{t.desc}</div>
               </div>
-            </Reveal>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
@@ -310,7 +311,9 @@ export function Home() {
           {USE_CASES.map((uc, i) => (
             <Reveal key={uc.title} delay={i * 60}>
               <div className="span-4 card card-pad">
-                <div style={{ fontSize: 24, marginBottom: 6 }}>{uc.icon}</div>
+                <div className="use-case-icon" style={{ marginBottom: 10 }}>
+                  <uc.icon width={20} height={20} />
+                </div>
                 <h3 style={{ fontSize: 15, marginBottom: 4 }}>{uc.title}</h3>
                 <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{uc.body}</p>
               </div>
