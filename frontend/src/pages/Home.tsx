@@ -117,8 +117,12 @@ const TECH = [
   { label: 'Pera Wallet', desc: 'Browser signing' },
 ];
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 function FeatureVisual({ kind }: { kind: string }) {
   const { nodeRef, onMouseMove, onMouseLeave } = useTilt<HTMLDivElement>(6);
+  const loop = !prefersReducedMotion;
 
   if (kind === 'seal-reject') {
     return (
@@ -129,7 +133,26 @@ function FeatureVisual({ kind }: { kind: string }) {
         className="feature-visual glass tilt-card"
         style={{ background: 'linear-gradient(160deg, var(--danger-bg), transparent)' }}
       >
-        <VerificationSeal outcome="rejected" size={104} />
+        <svg width="118" height="118" viewBox="0 0 130 130" style={{ position: 'absolute' }} aria-hidden="true">
+          <defs>
+            <linearGradient id="radarFade" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="var(--danger)" stopOpacity="0" />
+            </linearGradient>
+            <clipPath id="radarClip">
+              <circle cx="65" cy="65" r="58" />
+            </clipPath>
+          </defs>
+          <circle cx="65" cy="65" r="58" fill="none" stroke="var(--danger-border)" strokeWidth="1" opacity="0.5" />
+          <g clipPath="url(#radarClip)">
+            <path d="M65,65 L65,7 A58,58 0 0,1 113,42 Z" fill="url(#radarFade)">
+              {loop && (
+                <animateTransform attributeName="transform" type="rotate" from="0 65 65" to="360 65 65" dur="3.4s" repeatCount="indefinite" />
+              )}
+            </path>
+          </g>
+        </svg>
+        <VerificationSeal outcome="rejected" size={88} />
       </div>
     );
   }
@@ -140,14 +163,29 @@ function FeatureVisual({ kind }: { kind: string }) {
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
         className="feature-visual glass tilt-card"
-        style={{ background: 'linear-gradient(160deg, var(--seal-bg), transparent)', padding: 20 }}
+        style={{ background: 'linear-gradient(160deg, var(--seal-bg), transparent)' }}
       >
-        <div style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--seal-strong)', lineHeight: 2 }}>
-          <div>HTTP 402 · Payment Required</div>
-          <div>scheme: exact · asset: USDC</div>
-          <div className="mono" style={{ opacity: 0.6 }}>wallet signs → GoPlausible settles</div>
-          <div style={{ color: 'var(--success)' }}>✓ settled → semantic repair authorized</div>
-        </div>
+        <svg width="92%" viewBox="0 0 200 74" fill="none">
+          <text x="20" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">Wallet</text>
+          <text x="82" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">GoPlausible</text>
+          <text x="166" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">Repair</text>
+          <line x1="20" y1="28" x2="180" y2="28" stroke="var(--seal-border)" strokeWidth="1.4" strokeDasharray="1 5" />
+          {[20, 100, 180].map((cx) => (
+            <circle key={cx} cx={cx} cy={28} r={6} fill="var(--seal-bg)" stroke="var(--seal-strong)" strokeWidth="1.6" />
+          ))}
+          {loop && (
+            <circle r="3.2" fill="var(--seal)">
+              <animateMotion dur="2.4s" repeatCount="indefinite" path="M20,28 L180,28" />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.9;1" dur="2.4s" repeatCount="indefinite" />
+            </circle>
+          )}
+          <text x="100" y="58" textAnchor="middle" fontSize="8" fontFamily="var(--mono)" fill="var(--success)">
+            {loop && (
+              <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.75;0.86;0.97;1" dur="2.4s" repeatCount="indefinite" />
+            )}
+            settled → repair authorized
+          </text>
+        </svg>
       </div>
     );
   }
@@ -159,14 +197,22 @@ function FeatureVisual({ kind }: { kind: string }) {
       className="feature-visual glass tilt-card"
       style={{ background: 'linear-gradient(160deg, var(--accent-bg), transparent)' }}
     >
-      <svg width="70%" viewBox="0 0 200 120" fill="none">
+      <svg width="80%" viewBox="0 0 200 90" fill="none">
         {[0, 1, 2, 3].map((i) => (
           <g key={i}>
-            <rect x={10 + i * 46} y={40} width={34} height={34} rx={6} stroke="var(--accent-strong)" strokeWidth="2" />
-            {i < 3 && <line x1={44 + i * 46} y1={57} x2={56 + i * 46} y2={57} stroke="var(--accent-strong)" strokeWidth="2" />}
+            <rect x={10 + i * 46} y={16} width={34} height={34} rx={6} stroke="var(--accent-strong)" strokeWidth="2" fill="var(--accent-bg)">
+              {loop && (
+                <animate attributeName="stroke-opacity" values="1;0.3;1" keyTimes="0;0.5;1" dur="2.8s" begin={`${i * 0.35}s`} repeatCount="indefinite" />
+              )}
+            </rect>
+            {i < 3 && (
+              <line x1={44 + i * 46} y1={33} x2={56 + i * 46} y2={33} stroke="var(--accent-strong)" strokeWidth="2" strokeDasharray="2 4">
+                {loop && <animate attributeName="stroke-dashoffset" values="0;-12" dur="1s" repeatCount="indefinite" />}
+              </line>
+            )}
           </g>
         ))}
-        <text x="100" y="100" textAnchor="middle" fontSize="9" fill="var(--accent-strong)" fontFamily="var(--mono)">
+        <text x="100" y="76" textAnchor="middle" fontSize="9" fill="var(--accent-strong)" fontFamily="var(--mono)">
           receipt hashes → Merkle root
         </text>
       </svg>
