@@ -54,6 +54,15 @@ export function Footer() {
               {API_BASE}
             </span>
           </div>
+
+          <div className="footer-col" style={{ gridColumn: 'span 2' }}>
+            <h4>Developers</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+               <span>Vishwa Panchal (<a href="https://github.com/vishwapanchal" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>GitHub</a>, <a href="https://linkedin.com/in/thevishwapanchal" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>LinkedIn</a>)</span>
+               <span>Yashvanth M U (<a href="https://github.com/Yashvanth-7353" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>GitHub</a>, <a href="https://linkedin.com/in/yashvanthmu" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>LinkedIn</a>)</span>
+               <span>Prafull Gupta (<a href="https://github.com/prafullg01" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>GitHub</a>, <a href="https://linkedin.com/in/prafullgupta01" target="_blank" rel="noreferrer" style={{display: 'inline', padding: 0}}>LinkedIn</a>)</span>
+            </div>
+          </div>
         </div>
 
         <div className="footer-base">

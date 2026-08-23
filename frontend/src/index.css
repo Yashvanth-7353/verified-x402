@@ -307,11 +307,11 @@ code,
 .dock-nav,
 .dock-toggle {
   pointer-events: auto;
-  background: rgba(255, 255, 255, calc(0.78 + 0.14 * var(--nav-progress, 0)));
-  backdrop-filter: blur(calc(30px + 12px * var(--nav-progress, 0))) saturate(calc(190% + 20% * var(--nav-progress, 0)));
-  -webkit-backdrop-filter: blur(calc(30px + 12px * var(--nav-progress, 0))) saturate(calc(190% + 20% * var(--nav-progress, 0)));
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 10px 32px -8px rgba(20, 22, 14, 0.1), 0 2px 6px -1px rgba(20, 22, 14, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, calc((0.78 + 0.14 * var(--nav-progress, 0)) * (1 - var(--nav-progress, 0))));
+  backdrop-filter: blur(calc((30px + 12px * var(--nav-progress, 0)) * (1 - var(--nav-progress, 0)))) saturate(calc(100% + (90% + 20% * var(--nav-progress, 0)) * (1 - var(--nav-progress, 0))));
+  -webkit-backdrop-filter: blur(calc((30px + 12px * var(--nav-progress, 0)) * (1 - var(--nav-progress, 0)))) saturate(calc(100% + (90% + 20% * var(--nav-progress, 0)) * (1 - var(--nav-progress, 0))));
+  border: 1px solid rgba(255, 255, 255, calc(0.85 * (1 - var(--nav-progress, 0))));
+  box-shadow: 0 10px 32px -8px rgba(20, 22, 14, calc(0.1 * (1 - var(--nav-progress, 0)))), 0 2px 6px -1px rgba(20, 22, 14, calc(0.04 * (1 - var(--nav-progress, 0)))), inset 0 1px 1px 0 rgba(255, 255, 255, calc(0.95 * (1 - var(--nav-progress, 0))));
 }
 
 .dock-brand {
@@ -1376,6 +1376,27 @@ details.tech[open] summary {
 .hero-title-ai {
   font-family: 'Akronim', var(--landing-heading);
   letter-spacing: 0.02em;
+  font-size: 1.6em;
+  display: inline-block;
+  animation: ai-pulse 2s infinite ease-in-out;
+}
+
+@keyframes ai-pulse {
+  0% {
+    transform: scale(1) rotate(0deg);
+    color: inherit;
+    text-shadow: none;
+  }
+  50% {
+    transform: scale(1.2) rotate(3deg);
+    color: var(--accent);
+    text-shadow: 0 0 15px var(--accent-strong);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    color: inherit;
+    text-shadow: none;
+  }
 }
 
 .editorial-quote {
