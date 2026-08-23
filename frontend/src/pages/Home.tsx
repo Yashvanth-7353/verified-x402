@@ -299,59 +299,42 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---------- Pipeline: horizontal scroll-snap ---------- */}
+      {/* ---------- Pipeline: no-scroll node diagram, live loop per stage ---------- */}
       <section className="container" style={{ marginTop: 24, marginBottom: 56 }}>
         <Reveal>
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             The pipeline
           </div>
         </Reveal>
-        <div className="snap-strip pipeline-flow" style={{ position: 'relative', alignItems: 'stretch' }}>
+        <div className="pipeline-rail">
           {STEPS.map((s, i) => {
             const color = PIPE_TONE_VAR[s.tone];
             return (
               <Fragment key={s.title}>
                 <Reveal delay={i * 70}>
-                  <div
-                    className="card glass card-pad pipe-card"
-                    style={{ width: 250, height: '100%', ['--pipe-tone' as string]: color }}
-                  >
-                    <div className="pipe-card-top">
-                      <span className="pipe-icon-badge" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>
-                        <s.icon width={20} height={20} />
-                      </span>
-                      <span className="pipe-index mono">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="pipe-node" style={{ ['--pipe-tone' as string]: color }}>
+                    <div className="pipe-node-circle">
+                      <span className="pipe-node-ring" style={{ animationDelay: `${i * 0.35}s` }} />
+                      <s.icon width={22} height={22} />
+                      <span className="pipe-node-index mono">{i + 1}</span>
                     </div>
-                    <h3 style={{ fontSize: 'var(--fs-lg)', margin: '14px 0 8px' }}>{s.title}</h3>
-                    <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.body}</p>
+                    <h3 className="pipe-node-title">{s.title}</h3>
+                    <p className="pipe-node-body">{s.body}</p>
                   </div>
                 </Reveal>
-                <PipeLink color={color} />
+                {i < STEPS.length - 1 && <PipeLink color={color} />}
               </Fragment>
             );
           })}
-          <Reveal delay={STEPS.length * 70}>
-            <div
-              className="card card-pad"
-              style={{
-                width: 250,
-                height: '100%',
-                background: 'linear-gradient(160deg, var(--accent), var(--accent-strong))',
-                color: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-              }}
-            >
-              <p className="editorial-quote" style={{ color: '#fff', fontSize: 20, marginBottom: 8 }}>
-                "No valid proof, no execution."
-              </p>
-              <p style={{ fontSize: 12.5, opacity: 0.85 }}>
-                A downstream system checks the signature and output hash before it acts — every time.
-              </p>
-            </div>
-          </Reveal>
         </div>
+        <Reveal delay={STEPS.length * 70}>
+          <div className="pipeline-quote">
+            <p className="editorial-quote">"No valid proof, no execution."</p>
+            <p className="pipeline-quote-sub">
+              A downstream system checks the signature and output hash before it acts — every time.
+            </p>
+          </div>
+        </Reveal>
       </section>
 
       {/* ---------- Technology stack: auto-scrolling marquee ---------- */}
