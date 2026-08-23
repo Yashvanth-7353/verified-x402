@@ -267,14 +267,14 @@ code,
 .dock-row {
   display: flex;
   align-items: center;
-  gap: calc(10px - 4px * var(--nav-progress, 0));
-  /* The dock narrows horizontally as the page scrolls (maximized at the
-     top, minimized once fully scrolled) and widens back out on the way
-     back up — driven continuously by --nav-progress, no discrete jump. */
-  max-width: calc(1180px - 520px * var(--nav-progress, 0));
+  gap: 10px;
+  /* The row itself keeps a fixed max-width/position so the brand's
+     screen position never moves — only the nav/wallet/toggle children
+     below vanish horizontally on scroll (see .dock-nav / .dock-wallet),
+     collapsing toward the brand rather than the whole bar shrinking. */
+  max-width: 1180px;
   width: 100%;
   justify-content: space-between;
-  margin: 0 auto;
   --nav-fade: clamp(0, calc((0.45 - var(--nav-progress, 0)) / 0.45), 1);
   --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
 }
@@ -317,11 +317,7 @@ code,
   font-family: var(--grotesk);
   font-weight: 700;
   font-size: 17px;
-  margin-left: calc(8px * (1 - var(--nav-shrink, 0)));
-  max-width: calc(140px * (1 - var(--nav-shrink, 0)));
-  opacity: calc(1 - var(--nav-shrink, 0));
-  overflow: hidden;
-  white-space: nowrap;
+  margin-left: 8px;
   letter-spacing: -0.01em;
   color: var(--text);
 }
@@ -335,10 +331,16 @@ code,
   position: relative;
   display: flex;
   align-items: center;
-  gap: calc(2px - 2px * var(--nav-shrink, 0));
+  gap: 2px;
   border-radius: 999px;
-  padding: calc(6px - 2px * var(--nav-shrink, 0));
+  padding: 6px;
   transition: box-shadow 260ms var(--ease), background 260ms var(--ease);
+  /* Vanishes horizontally — clipped and faded away — as the page scrolls,
+     and grows back open on the way up. Driven continuously by
+     --nav-progress so it scrubs with the scroll instead of snapping. */
+  max-width: calc(520px * (1 - var(--nav-progress, 0)));
+  opacity: clamp(0, calc(1 - var(--nav-progress, 0) * 1.4), 1);
+  overflow: hidden;
 }
 
 .dock-pill {
@@ -371,9 +373,9 @@ code,
 .dock-link {
   position: relative;
   z-index: 1;
-  padding: 9px calc(16px - 6px * var(--nav-shrink, 0));
+  padding: 9px 16px;
   border-radius: 999px;
-  font-size: calc(13px - 1px * var(--nav-shrink, 0));
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   color: var(--text-muted);
@@ -391,6 +393,14 @@ code,
 }
 .dock-link.active:hover {
   background: none;
+}
+
+.dock-wallet {
+  /* Vanishes horizontally alongside .dock-nav on scroll down, grows back
+     open on the way up — same continuous --nav-progress scrub. */
+  max-width: calc(220px * (1 - var(--nav-progress, 0)));
+  opacity: clamp(0, calc(1 - var(--nav-progress, 0) * 1.4), 1);
+  overflow: hidden;
 }
 
 .dock-toggle {
