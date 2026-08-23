@@ -3,7 +3,7 @@
    Single light theme. Trust-infrastructure aesthetic: quiet, precise, technical.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Quicksand:wght@500;600;700&display=swap');
 
 :root {
   /* Ledger paper — cool, not the warm-cream AI default */
@@ -60,6 +60,7 @@
   --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
   --editorial: 'Instrument Serif', var(--display);
   --poster: 'Bebas Neue', var(--grotesk);
+  --landing-heading: 'Quicksand', var(--grotesk);
 
   /* Fluid type scale — use these instead of ad hoc px sizes */
   --fs-xs: 12px;
@@ -270,12 +271,34 @@ code,
   max-width: 1180px;
   width: 100%;
   justify-content: space-between;
-  transition: max-width 380ms var(--ease), gap 380ms var(--ease);
+  transition: max-width 420ms var(--ease), gap 420ms var(--ease);
 }
 
 .dock-row.nav-scrolled {
-  max-width: 760px;
-  gap: 6px;
+  max-width: 220px;
+  gap: 0;
+  justify-content: center;
+}
+
+/* Scrolled: nav links and wallet collapse away, brand ends up alone and
+   centered. Scrolling back up reverses the same transition, so the header
+   visibly re-expands and the brand returns to its left-aligned slot. */
+.dock-nav,
+.dock-wallet,
+.dock-toggle {
+  transition: opacity 260ms var(--ease), max-width 420ms var(--ease), margin 420ms var(--ease), transform 300ms var(--ease);
+  max-width: 600px;
+  overflow: hidden;
+}
+
+.nav-scrolled .dock-nav,
+.nav-scrolled .dock-wallet,
+.nav-scrolled .dock-toggle {
+  opacity: 0;
+  max-width: 0;
+  margin: 0 !important;
+  transform: scale(0.85);
+  pointer-events: none;
 }
 
 .dock-brand,
@@ -1358,8 +1381,11 @@ details.tech[open] summary {
 
 .hero-title {
   display: block;
+  font-family: var(--landing-heading);
+  font-weight: 700;
   font-size: var(--fs-3xl);
   line-height: 1.04;
+  letter-spacing: -0.01em;
   margin: 18px 0 4px;
 }
 

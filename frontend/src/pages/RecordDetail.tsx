@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getRecord, getMerkleProof } from '../api/client';
-import { ApiError, type MerkleProofResponse, type RecordSummary } from '../api/types';
+import { ApiError, type MerkleProofResponse, type RecordSummary, type VerificationReceipt } from '../api/types';
 import { HashChip } from '../components/Copyable';
 import { EmptyState, ErrorBanner } from '../components/Feedback';
 import { OutcomeBadge, Pill } from '../components/StatusBadge';
@@ -17,6 +17,7 @@ type RecordDetail = RecordSummary & {
   repair_type?: string | null;
   payment_facilitator?: string | null;
   settlement_network?: string | null;
+  receipt?: VerificationReceipt | null;
 };
 
 // Timeline steps are built dynamically from the actual backend record data.
