@@ -323,7 +323,11 @@ export function RecordDetail() {
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link to="/verify-receipt" state={{ receipt: { receipt_id: record.receipt_id, request_id_ref: record.request_id, outcome: record.outcome, output_hash: record.output_hash || '', receipt_hash: record.receipt_hash } }} className="btn btn-ghost btn-sm">
+          <Link
+            to="/verify-receipt"
+            state={{ receipt: record.receipt ?? { receipt_id: record.receipt_id, request_id_ref: record.request_id, outcome: record.outcome, output_hash: record.output_hash || '', receipt_hash: record.receipt_hash } }}
+            className="btn btn-ghost btn-sm"
+          >
             Verify receipt
           </Link>
           {!isAnchored && (

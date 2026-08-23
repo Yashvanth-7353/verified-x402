@@ -48,6 +48,7 @@ class RecordDetail(RecordSummary):
     repair_type: Optional[str] = None
     payment_facilitator: Optional[str] = None
     settlement_network: Optional[str] = None
+    receipt: Optional[dict] = None  # Authoritative VerificationReceipt
 
 
 class RecordsListResponse(BaseModel):
@@ -77,8 +78,20 @@ def _record_to_summary(row: dict) -> RecordSummary:
 
 def _record_to_detail(row: dict) -> RecordDetail:
     """Convert a database row to a safe RecordDetail."""
+    import json as _json
+
     base = _record_to_summary(row)
-    # repair_type is already in base via RecordSummary.model_dump()
+
+    # Deserialize the authoritative receipt from the stored receipt_json.
+    # This is the EXACT receipt that was signed — not reconstructed.
+    receipt_dict = None
+    receipt_json = row.get("receipt_json")
+    if receipt_json:
+        try:
+            receipt_dict = _json.loads(receipt_json)
+        except Exception:
+            receipt_dict = None
+
     return RecordDetail(
         **base.model_dump(),
         schema_ref_and_version=row.get("schema_ref_and_version"),
@@ -88,6 +101,7 @@ def _record_to_detail(row: dict) -> RecordDetail:
         agent_identifier=row.get("agent_identifier"),
         payment_facilitator=row.get("payment_facilitator"),
         settlement_network=row.get("settlement_network"),
+        receipt=receipt_dict,
     )
 
 

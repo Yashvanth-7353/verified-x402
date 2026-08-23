@@ -141,7 +141,7 @@ export function listRecords(offset = 0, limit = 50): Promise<RecordsListResponse
   return request(`/api/v1/records?offset=${offset}&limit=${limit}`);
 }
 
-export function getRecord(recordId: string): Promise<RecordSummary & { schema_ref_and_version?: string | null; validator_version?: string | null; signing_key_id?: string | null; signature_algorithm?: string | null; agent_identifier?: string | null; repair_type?: string | null; payment_facilitator?: string | null; settlement_network?: string | null }> {
+export function getRecord(recordId: string): Promise<RecordSummary & { schema_ref_and_version?: string | null; validator_version?: string | null; signing_key_id?: string | null; signature_algorithm?: string | null; agent_identifier?: string | null; repair_type?: string | null; payment_facilitator?: string | null; settlement_network?: string | null; receipt?: VerificationReceipt | null }> {
   return request(`/api/v1/records/${recordId}`);
 }
 
