@@ -2316,9 +2316,9 @@ details.tech[open] summary {
   }
 }
 * { 
-  cursor: url('https://cdn.sweezy-cursors.com/cursor_packs/261454be-9390-4148-86e4-3084a2cd4428/h-e-r-b-i-e-animated--cursor-image.png') 18 6, auto !important; 
+  cursor: url('data:image/svg+xml;utf8,<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg"><image href="https://cdn.sweezy-cursors.com/cursor_packs/261454be-9390-4148-86e4-3084a2cd4428/h-e-r-b-i-e-animated--cursor-image.png" width="48" height="48" /></svg>') 7 2, auto !important; 
 }
 
 a, button, [role="button"], input, select, textarea {
-  cursor: url('https://cdn.sweezy-cursors.com/cursor_packs/261454be-9390-4148-86e4-3084a2cd4428/h-e-r-b-i-e-animated--pointer-image.png') 18 6, pointer !important;
+  cursor: url('data:image/svg+xml;utf8,<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg"><image href="https://cdn.sweezy-cursors.com/cursor_packs/261454be-9390-4148-86e4-3084a2cd4428/h-e-r-b-i-e-animated--pointer-image.png" width="48" height="48" /></svg>') 7 2, pointer !important;
 }
