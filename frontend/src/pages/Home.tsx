@@ -270,7 +270,9 @@ export function Home() {
               speed={26}
               className="hero-title"
               segments={[
-                { text: 'Verify what AI produces.' },
+                { text: 'Verify what ' },
+                { text: 'AI', className: 'hero-title-ai' },
+                { text: ' produces.' },
               ]}
             />
             <p style={{ fontSize: 'var(--fs-md)', color: 'var(--text-muted)', maxWidth: 540, marginTop: 16 }}>
