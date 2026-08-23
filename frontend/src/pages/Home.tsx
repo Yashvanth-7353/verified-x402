@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Guilloche, VerificationSeal } from '../components/VerificationSeal';
 import { Reveal } from '../components/Reveal';
@@ -7,15 +7,65 @@ import { useParallax } from '../lib/useReveal';
 import { useTilt } from '../lib/useTilt';
 import { loadSessionLog } from '../lib/session';
 import { relativeTime } from '../lib/format';
-import { BoltIcon, PackageIcon, LinkIcon, PlugIcon, ClipboardIcon } from '../components/icons';
+import {
+  BoltIcon, PackageIcon, LinkIcon, PlugIcon, ClipboardIcon,
+  ScanCheckIcon, WrenchIcon, RefreshIcon, StampIcon, AnchorGlyphIcon,
+} from '../components/icons';
 
 const STEPS = [
-  { title: 'Validate', body: 'Schema, type, syntax, SQL-safety and privacy checks run locally — nothing leaves the device yet.' },
-  { title: 'Repair', body: 'Fixable issues are corrected by bounded, rule-based repair, or escalated to paid semantic repair if not.' },
-  { title: 'Re-validate', body: 'Every repair — deterministic or semantic — is run back through the same pipeline. Nothing is trusted blindly.' },
-  { title: 'Prove', body: 'A cryptographically bound, Ed25519-signed receipt is issued for every outcome — pass, repair, or reject.' },
-  { title: 'Anchor', body: 'Receipts are batched into a Merkle tree; only the root is committed to Algorand — never the raw payload.' },
-];
+  {
+    title: 'Validate',
+    body: 'Schema, type, syntax, SQL-safety and privacy checks run locally — nothing leaves the device yet.',
+    icon: ScanCheckIcon,
+    tone: 'accent',
+  },
+  {
+    title: 'Repair',
+    body: 'Fixable issues are corrected by bounded, rule-based repair, or escalated to paid semantic repair if not.',
+    icon: WrenchIcon,
+    tone: 'seal',
+  },
+  {
+    title: 'Re-validate',
+    body: 'Every repair — deterministic or semantic — is run back through the same pipeline. Nothing is trusted blindly.',
+    icon: RefreshIcon,
+    tone: 'accent',
+  },
+  {
+    title: 'Prove',
+    body: 'A cryptographically bound, Ed25519-signed receipt is issued for every outcome — pass, repair, or reject.',
+    icon: StampIcon,
+    tone: 'accent-strong',
+  },
+  {
+    title: 'Anchor',
+    body: 'Receipts are batched into a Merkle tree; only the root is committed to Algorand — never the raw payload.',
+    icon: AnchorGlyphIcon,
+    tone: 'success',
+  },
+] as const;
+
+const PIPE_TONE_VAR: Record<string, string> = {
+  accent: 'var(--accent)',
+  'accent-strong': 'var(--accent-strong)',
+  seal: 'var(--seal)',
+  success: 'var(--success)',
+};
+
+/** Animated connector between pipeline stages — a traveling signal pulse. */
+function PipeLink({ color }: { color: string }) {
+  return (
+    <div className="pipe-link" aria-hidden="true">
+      <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
+        <line x1="2" y1="12" x2="46" y2="12" stroke={color} strokeWidth="1.5" strokeDasharray="1 5.5" strokeLinecap="round" opacity="0.55" />
+        <circle r="2.6" fill={color}>
+          <animateMotion dur="1.6s" repeatCount="indefinite" path="M2,12 L46,12" />
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="1.6s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
+}
 
 const FEATURES = [
   {
@@ -39,12 +89,20 @@ const FEATURES = [
 ];
 
 const USE_CASES = [
-  { icon: BoltIcon, title: 'AI Financial Agent', body: 'Validates payment instructions before execution.' },
-  { icon: PackageIcon, title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.' },
-  { icon: LinkIcon, title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.' },
-  { icon: PlugIcon, title: 'AI API Execution', body: 'Validates API requests before they are sent.' },
-  { icon: ClipboardIcon, title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.' },
-];
+  { icon: BoltIcon, title: 'AI Financial Agent', body: 'Validates payment instructions before execution.', tone: 'accent' },
+  { icon: PackageIcon, title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.', tone: 'seal' },
+  { icon: LinkIcon, title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.', tone: 'success' },
+  { icon: PlugIcon, title: 'AI API Execution', body: 'Validates API requests before they are sent.', tone: 'accent-strong' },
+  { icon: ClipboardIcon, title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.', tone: 'warning' },
+] as const;
+
+const USE_CASE_TONE_VAR: Record<string, string> = {
+  accent: 'var(--accent)',
+  'accent-strong': 'var(--accent-strong)',
+  seal: 'var(--seal)',
+  success: 'var(--success)',
+  warning: 'var(--warning)',
+};
 
 const TECH = [
   { label: 'FastAPI', desc: 'Backend API' },
@@ -248,24 +306,35 @@ export function Home() {
             The pipeline
           </div>
         </Reveal>
-        <div className="snap-strip" style={{ position: 'relative' }}>
-          <div className="pipeline-connect" />
-          {STEPS.map((s, i) => (
-            <Reveal key={s.title} delay={i * 70}>
-              <div className="card glass card-pad" style={{ width: 260, height: '100%' }}>
-                <span className="poster-figure" style={{ fontSize: 34, color: 'var(--accent-strong)' }}>
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <h3 style={{ fontSize: 'var(--fs-lg)', margin: '10px 0 8px' }}>{s.title}</h3>
-                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.body}</p>
-              </div>
-            </Reveal>
-          ))}
+        <div className="snap-strip pipeline-flow" style={{ position: 'relative', alignItems: 'stretch' }}>
+          {STEPS.map((s, i) => {
+            const color = PIPE_TONE_VAR[s.tone];
+            return (
+              <Fragment key={s.title}>
+                <Reveal delay={i * 70}>
+                  <div
+                    className="card glass card-pad pipe-card"
+                    style={{ width: 250, height: '100%', ['--pipe-tone' as string]: color }}
+                  >
+                    <div className="pipe-card-top">
+                      <span className="pipe-icon-badge" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>
+                        <s.icon width={20} height={20} />
+                      </span>
+                      <span className="pipe-index mono">{String(i + 1).padStart(2, '0')}</span>
+                    </div>
+                    <h3 style={{ fontSize: 'var(--fs-lg)', margin: '14px 0 8px' }}>{s.title}</h3>
+                    <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.body}</p>
+                  </div>
+                </Reveal>
+                <PipeLink color={color} />
+              </Fragment>
+            );
+          })}
           <Reveal delay={STEPS.length * 70}>
             <div
               className="card card-pad"
               style={{
-                width: 260,
+                width: 250,
                 height: '100%',
                 background: 'linear-gradient(160deg, var(--accent), var(--accent-strong))',
                 color: '#fff',
@@ -307,18 +376,24 @@ export function Home() {
         <Reveal>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Use cases</div>
         </Reveal>
-        <div className="bento">
-          {USE_CASES.map((uc, i) => (
-            <Reveal key={uc.title} delay={i * 60}>
-              <div className="span-4 card card-pad">
-                <div className="use-case-icon" style={{ marginBottom: 10 }}>
-                  <uc.icon width={20} height={20} />
+        <div className="use-case-grid">
+          {USE_CASES.map((uc, i) => {
+            const color = USE_CASE_TONE_VAR[uc.tone];
+            return (
+              <Reveal key={uc.title} delay={i * 60}>
+                <div className="card card-pad use-case-card" style={{ ['--uc-tone' as string]: color }}>
+                  <div className="use-case-icon">
+                    <span className="use-case-icon-ring" style={{ animationDelay: `${i * 0.4}s` }} />
+                    <uc.icon width={19} height={19} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 14.5, marginBottom: 3 }}>{uc.title}</h3>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>{uc.body}</p>
+                  </div>
                 </div>
-                <h3 style={{ fontSize: 15, marginBottom: 4 }}>{uc.title}</h3>
-                <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{uc.body}</p>
-              </div>
-            </Reveal>
-          ))}
+              </Reveal>
+            );
+          })}
         </div>
       </section>
 

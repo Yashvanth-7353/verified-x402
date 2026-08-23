@@ -81,3 +81,40 @@ export const ClipboardIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M9 12h6M9 16h6" />
   </svg>
 );
+
+export const ScanCheckIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M20 8V6a2 2 0 0 0-2-2h-2M20 16v2a2 2 0 0 1-2 2h-2" />
+    <path d="M8 12.5 10.5 15 16 9" />
+  </svg>
+);
+
+export const WrenchIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <path d="M14.5 3.5a5 5 0 0 0-6.6 6l-6 6 3 3 6-6a5 5 0 0 0 6-6.6l-3.2 3.2-2.4-2.4 3.2-3.2z" />
+  </svg>
+);
+
+export const RefreshIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <path d="M20 11a8 8 0 0 0-14.6-4.6M4 4v5h5" />
+    <path d="M4 13a8 8 0 0 0 14.6 4.6M20 20v-5h-5" />
+  </svg>
+);
+
+export const StampIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <path d="M9 4h6l1.5 5.5H7.5L9 4z" />
+    <path d="M8 9.5h8v5a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-5z" />
+    <path d="M4 20.5c1-1.6 2.4-1.6 3.2-.6.9 1 2.4 1 3.3 0 .9-1 2.3-1 3.2 0 .9 1 2.4 1 3.3 0 .8-1 2.2-1 3.2.6" />
+  </svg>
+);
+
+export const AnchorGlyphIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <circle cx="12" cy="5" r="2" />
+    <path d="M12 7v13" />
+    <path d="M5 12H2a10 10 0 0 0 10 10 10 10 0 0 0 10-10h-3" />
+    <path d="M8 9 12 12l4-3" />
+  </svg>
+);
