@@ -118,7 +118,7 @@ export function Nav() {
         </nav>
 
         {/* Wallet section */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', flexShrink: 0 }}>
+        <div className="dock-wallet" style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
           {activeAddress ? (
             <div style={{ position: 'relative' }}>
               <button
