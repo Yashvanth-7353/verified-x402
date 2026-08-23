@@ -336,7 +336,7 @@ export function Home() {
                 <FeatureVisual kind={f.visual} />
                 <div className="invariant-number mono">{f.eyebrow}</div>
                 <h2 style={{ fontSize: 'var(--fs-lg)', margin: '8px 0 8px' }}>{f.title}</h2>
-                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{f.body}</p>
+                <p style={{ fontSize: 15, color: 'var(--text-muted)', lineHeight: 1.5 }}>{f.body}</p>
               </div>
             </Reveal>
           ))}
@@ -359,7 +359,7 @@ export function Home() {
                   <div className="pipe-node" style={{ ['--pipe-tone' as string]: color }}>
                     <div className="pipe-node-circle">
                       <span className="pipe-node-ring" style={{ animationDelay: `${i * 0.35}s` }} />
-                      <s.icon width={22} height={22} />
+                      <s.icon width={26} height={26} />
                       <span className="pipe-node-index mono">{i + 1}</span>
                     </div>
                     <h3 className="pipe-node-title">{s.title}</h3>
@@ -389,9 +389,9 @@ export function Home() {
         <div className="marquee">
           <div className="marquee-track">
             {[...TECH, ...TECH].map((t, i) => (
-              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }} key={`${t.label}-${i}`}>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--grotesk)' }}>{t.label}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>{t.desc}</div>
+              <div className="card card-pad" style={{ minWidth: 150, textAlign: 'center' }} key={`${t.label}-${i}`}>
+                <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--grotesk)' }}>{t.label}</div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-faint)', marginTop: 3 }}>{t.desc}</div>
               </div>
             ))}
           </div>
@@ -411,11 +411,11 @@ export function Home() {
                 <div className="card card-pad use-case-card" style={{ ['--uc-tone' as string]: color }}>
                   <div className="use-case-icon">
                     <span className="use-case-icon-ring" style={{ animationDelay: `${i * 0.4}s` }} />
-                    <uc.icon width={19} height={19} />
+                    <uc.icon width={22} height={22} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: 14.5, marginBottom: 3 }}>{uc.title}</h3>
-                    <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>{uc.body}</p>
+                    <h3 style={{ fontSize: 16, marginBottom: 4 }}>{uc.title}</h3>
+                    <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.45 }}>{uc.body}</p>
                   </div>
                 </div>
               </Reveal>

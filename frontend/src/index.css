@@ -1960,8 +1960,8 @@ details.tech[open] summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--uc-tone, var(--accent)) 14%, transparent);
@@ -2036,7 +2036,7 @@ details.tech[open] summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2109,9 +2109,9 @@ details.tech[open] summary {
 }
 
 .pipe-node {
-  flex: 1 1 150px;
-  max-width: 190px;
-  min-width: 130px;
+  flex: 1 1 160px;
+  max-width: 200px;
+  min-width: 140px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2121,8 +2121,8 @@ details.tech[open] summary {
 
 .pipe-node-circle {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -2149,25 +2149,25 @@ details.tech[open] summary {
   position: absolute;
   bottom: -4px;
   right: -4px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   background: var(--surface);
   color: var(--pipe-tone, var(--accent));
   border: 1px solid var(--pipe-tone, var(--accent));
 }
 
 .pipe-node-title {
-  font-size: var(--fs-base);
+  font-size: var(--fs-lg);
   margin: 0 0 6px;
 }
 
 .pipe-node-body {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.45;
 }
@@ -2203,7 +2203,7 @@ details.tech[open] summary {
 }
 
 .pipeline-quote-sub {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
