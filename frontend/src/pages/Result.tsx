@@ -124,9 +124,14 @@ export function Result() {
       revalidatedState = 'done';
     }
 
+    // Initial validation: done only if outcome is 'verified' (passed first time).
+    // For rejected or verified_repaired, initial validation found issues.
+    const validatedState: Stage['state'] =
+      response.result.outcome === 'verified' ? 'done' : 'failed';
+
     return [
       { key: 'submitted', label: 'Submitted', state: 'done' },
-      { key: 'validated', label: 'Validated', state: 'done' },
+      { key: 'validated', label: 'Validated', state: validatedState },
       { key: 'escalated', label: 'Escalated', state: escalatedState },
       { key: 'paid', label: 'Paid', state: paidState },
       { key: 'repaired', label: 'Repaired', state: repairedState },
@@ -295,7 +300,7 @@ export function Result() {
           {response.result.repair_info && (
             <div className="card card-pad">
               <div className="section-title">Repair</div>
-              <RepairCompare repairInfo={response.result.repair_info} before={request.output_payload} />
+              <RepairCompare repairInfo={response.result.repair_info} before={request.output_payload} after={response.repaired_output} />
               {semanticProvider && (
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="badge badge-accent">Provider: {semanticProvider}</span>
@@ -304,8 +309,9 @@ export function Result() {
                   )}
                 </div>
               )}
-              {/* Show actual repaired output when backend provides it */}
-              {'repaired_output' in response && response.repaired_output && (
+              {/* Show actual repaired output for semantic repair only (deterministic is handled by RepairCompare) */}
+              {response.result.repair_info?.repair_type === 'semantic' &&
+                'repaired_output' in response && response.repaired_output && (
                 <div style={{ marginTop: 16 }}>
                   <div className="section-title">Groq repaired output</div>
                   <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginBottom: 8 }}>

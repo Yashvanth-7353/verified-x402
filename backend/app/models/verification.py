@@ -28,6 +28,7 @@ class SchemaPolicy(BaseModel):
     deterministic_repair_rules_ref: Optional[str] = None
     sql_safety_ruleset_ref: Optional[str] = None
     privacy_policy_ref: str
+    business_rules: Optional[list[dict[str, Any]]] = None
 
 class ValidationFinding(BaseModel):
     finding_id: UUID

@@ -42,7 +42,7 @@ def verify(payload: VerifyPayloadRequest) -> VerifyPayloadResponse:
     """Thin route: delegates all logic to the VerificationOrchestrator."""
     try:
         orchestrator = VerificationOrchestrator()
-        result, receipt = orchestrator.process(payload.request, payload.policy)
+        result, receipt, repaired_output = orchestrator.process(payload.request, payload.policy)
 
         # Phase 9: Persist the finalized record
         try:
@@ -55,7 +55,7 @@ def verify(payload: VerifyPayloadRequest) -> VerifyPayloadResponse:
                 payload.request.request_id,
             )
 
-        return VerifyPayloadResponse(result=result, receipt=receipt)
+        return VerifyPayloadResponse(result=result, receipt=receipt, repaired_output=repaired_output)
     except Exception as e:
         logger.exception("Unexpected error during verification")
         raise HTTPException(

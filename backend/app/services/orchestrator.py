@@ -1,10 +1,10 @@
 from copy import deepcopy
-from typing import Tuple
+from typing import Tuple, Optional
 
 from app.models.verification import (
     VerificationRequest, SchemaPolicy, VerificationResult, VerificationReceipt
 )
-from app.models.enums import VerificationOutcome, Severity
+from app.models.enums import VerificationOutcome, Severity, ValidationStage
 from app.validation.engine import VerificationEngine
 from app.repair.deterministic import DeterministicRepairEngine
 from app.evidence.receipt import ReceiptService
@@ -27,7 +27,7 @@ class VerificationOrchestrator:
 
     def process(
         self, request: VerificationRequest, policy: SchemaPolicy
-    ) -> Tuple[VerificationResult, VerificationReceipt]:
+    ) -> Tuple[VerificationResult, VerificationReceipt, Optional[dict]]:
         # 1. Initial validation
         result = self.verification_engine.verify_request(
             request, policy, VALIDATOR_VERSION
@@ -43,7 +43,13 @@ class VerificationOrchestrator:
         )
 
         # 2. Deterministic repair
-        if has_blocking and not schema_is_invalid:
+        # Skip if the only blocking findings are business-logic violations
+        # (deterministic repair cannot reason about arithmetic or domain rules)
+        has_blocking_non_business = any(
+            f.severity == Severity.blocking and f.stage != ValidationStage.business_logic
+            for f in result.findings
+        )
+        if has_blocking and has_blocking_non_business and not schema_is_invalid:
             repaired_payload, repair_info = self.deterministic_repair_engine.attempt_repair(
                 request, policy, result.findings
             )
@@ -79,4 +85,10 @@ class VerificationOrchestrator:
             request, policy, result, final_payload
         )
 
-        return result, receipt
+        # Include repaired output when deterministic repair succeeded
+        # (i.e., final_payload differs from the original input)
+        repaired_output = None
+        if final_payload != request.output_payload:
+            repaired_output = final_payload
+
+        return result, receipt, repaired_output

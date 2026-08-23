@@ -25,6 +25,7 @@ export interface SchemaPolicy {
   deterministic_repair_rules_ref?: string | null;
   sql_safety_ruleset_ref?: string | null;
   privacy_policy_ref: string;
+  business_rules?: Array<Record<string, unknown>> | null;
 }
 
 export interface ValidationFinding {
@@ -87,6 +88,8 @@ export interface PaymentMetadata {
 export interface VerifyResponse {
   result: VerificationResult;
   receipt: VerificationReceipt;
+  /** Present when deterministic repair was applied and succeeded. */
+  repaired_output?: Record<string, unknown> | null;
 }
 
 export interface SemanticRepairResponse extends VerifyResponse {
