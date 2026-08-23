@@ -2315,6 +2315,6 @@ details.tech[open] summary {
     transition-duration: 0.001ms !important;
   }
 }
-* { cursor: none !important; }
+
 
 a, button, [role="button"], input, select, textarea { cursor: none !important; }
