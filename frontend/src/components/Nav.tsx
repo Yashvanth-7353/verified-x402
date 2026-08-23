@@ -28,8 +28,11 @@ function isLinkActive(pathname: string, link: (typeof LINKS)[number]): boolean {
  *  should take a good, deliberate scroll before the header is fully minimized. */
 const NAV_COLLAPSE_RANGE = 420;
 /** How quickly the displayed progress eases toward the scroll-derived target
- *  each frame (0..1, lower = slower/smoother, more of a lagging "catch up" feel). */
-const NAV_EASE = 0.05;
+ *  each frame (0..1, lower = slower/smoother, more of a lagging "catch up" feel).
+ *  0.05 took ~2.3s to converge, which made the header visibly lag behind
+ *  after a route change scrolled back to top — 0.18 converges in ~0.6s,
+ *  still eased but quick enough to read as responsive. */
+const NAV_EASE = 0.18;
 
 export function Nav() {
   const [open, setOpen] = useState(false);

@@ -279,18 +279,31 @@ code,
   --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
 }
 
-.dock-brand,
 .dock-nav,
 .dock-toggle {
   pointer-events: auto;
+  /* Blur/saturate radius is intentionally NOT progress-driven — recomputing
+     backdrop-filter every scroll frame is the most expensive part of this
+     bar and was the main source of scroll jank. Only cheap alpha values
+     (background/border/shadow) scrub continuously; the filter itself is
+     computed once and left alone. */
   background: rgba(255, 255, 255, calc(0.78 * (1 - var(--nav-progress, 0))));
-  backdrop-filter: blur(calc(30px * (1 - var(--nav-progress, 0)))) saturate(calc(100% + 90% * (1 - var(--nav-progress, 0))));
-  -webkit-backdrop-filter: blur(calc(30px * (1 - var(--nav-progress, 0)))) saturate(calc(100% + 90% * (1 - var(--nav-progress, 0))));
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, calc(0.85 * (1 - var(--nav-progress, 0))));
   box-shadow: 0 10px 32px -8px rgba(20, 22, 14, calc(0.1 * (1 - var(--nav-progress, 0)))), 0 2px 6px -1px rgba(20, 22, 14, calc(0.04 * (1 - var(--nav-progress, 0)))), inset 0 1px 1px 0 rgba(255, 255, 255, calc(0.95 * (1 - var(--nav-progress, 0))));
 }
 
 .dock-brand {
+  /* Always fully opaque — this is the one element that must stay legible
+     against whatever page content scrolls underneath it, so it does not
+     share the nav/toggle's fade-to-transparent treatment. */
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 32px -8px rgba(20, 22, 14, 0.1), 0 2px 6px -1px rgba(20, 22, 14, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,12 +347,15 @@ code,
   gap: 2px;
   border-radius: 999px;
   padding: 6px;
-  transition: box-shadow 260ms var(--ease), background 260ms var(--ease);
+  /* No transition on background/box-shadow here — both are already
+     progress-driven via calc() and rewritten every scroll frame; a CSS
+     transition on top of a value that's already animating makes it chase
+     a moving target and looks laggy instead of smooth. */
   /* Vanishes horizontally — clipped and faded away — as the page scrolls,
      and grows back open on the way up. Driven continuously by
      --nav-progress so it scrubs with the scroll instead of snapping. */
-  max-width: calc(520px * (1 - var(--nav-progress, 0)));
-  opacity: clamp(0, calc(1 - var(--nav-progress, 0) * 1.4), 1);
+  max-width: calc(640px * (1 - var(--nav-progress, 0)));
+  opacity: calc(1 - var(--nav-progress, 0));
   overflow: hidden;
 }
 
@@ -350,7 +366,9 @@ code,
   left: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--text) 0%, #2f3338 100%);
-  transition: transform 420ms var(--ease), width 420ms var(--ease), opacity 200ms var(--ease), top 260ms var(--ease), bottom 260ms var(--ease);
+  /* top/bottom are progress-driven (see below) and rewritten every scroll
+     frame — no transition on them, same reasoning as .dock-nav above. */
+  transition: transform 420ms var(--ease), width 420ms var(--ease), opacity 200ms var(--ease);
   z-index: 0;
   box-shadow: 0 4px 14px rgba(20, 22, 14, 0.22);
   overflow: hidden;
@@ -399,7 +417,7 @@ code,
   /* Vanishes horizontally alongside .dock-nav on scroll down, grows back
      open on the way up — same continuous --nav-progress scrub. */
   max-width: calc(220px * (1 - var(--nav-progress, 0)));
-  opacity: clamp(0, calc(1 - var(--nav-progress, 0) * 1.4), 1);
+  opacity: calc(1 - var(--nav-progress, 0));
   overflow: hidden;
 }
 

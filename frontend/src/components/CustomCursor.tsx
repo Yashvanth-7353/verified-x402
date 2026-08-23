@@ -30,15 +30,29 @@ export function CustomCursor() {
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
 
-    const animate = () => {
+    // Trailing time-constant in ms — the outer ring closes ~63% of the
+    // remaining distance every TAU ms, regardless of frame rate. A fixed
+    // per-frame lerp factor (the old approach) implicitly assumes 60fps:
+    // on a 120Hz display it applies twice as often and trails noticeably
+    // less, on a throttled/laggy tab it jumps in bigger steps — both read
+    // as inconsistent motion. Deriving the factor from actual elapsed time
+    // keeps the trail feeling identical everywhere.
+    const TAU = 55;
+    let lastTime = performance.now();
+
+    const animate = (now: number) => {
+      const dt = now - lastTime;
+      lastTime = now;
+
       // Inner cursor instantly follows mouse
       if (innerRef.current) {
         innerRef.current.style.transform = `translate3d(${mouse.current.x}px, ${mouse.current.y}px, 0)`;
       }
 
-      // Outer cursor trails slightly
-      trailed.current.x += (mouse.current.x - trailed.current.x) * 0.35;
-      trailed.current.y += (mouse.current.y - trailed.current.y) * 0.35;
+      // Outer cursor trails slightly, eased by elapsed time not frame count
+      const factor = 1 - Math.exp(-dt / TAU);
+      trailed.current.x += (mouse.current.x - trailed.current.x) * factor;
+      trailed.current.y += (mouse.current.y - trailed.current.y) * factor;
 
       if (outerRef.current) {
         outerRef.current.style.transform = `translate3d(${trailed.current.x}px, ${trailed.current.y}px, 0)`;
@@ -92,6 +106,7 @@ export function CustomCursor() {
           border: `1.5px solid ${hovered ? 'var(--seal)' : 'var(--accent)'}`,
           pointerEvents: 'none',
           zIndex: 9998,
+          willChange: 'transform',
           transition: 'border-color 0.3s ease, width 0.3s ease, height 0.3s ease, margin 0.3s ease',
           display: 'flex',
           alignItems: 'center',
