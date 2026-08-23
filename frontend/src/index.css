@@ -1369,29 +1369,22 @@ details.tech[open] summary {
 }
 
 .hero-title-ai {
-  position: relative;
   font-family: 'Akronim', var(--landing-heading);
   letter-spacing: 0.02em;
   font-size: 1.6em;
   display: inline-block;
+  background: linear-gradient(90deg, #ff4081, #00e5ff, #7c4dff, #ff4081);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-ai 4s linear infinite;
+  text-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+  filter: drop-shadow(0 0 8px rgba(255, 64, 129, 0.3));
 }
 
-.hero-title-ai::after {
-  content: '';
-  position: absolute;
-  left: 2%;
-  right: 2%;
-  bottom: -0.06em;
-  height: 3px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--seal), var(--accent) 60%, var(--seal));
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 700ms var(--ease) 120ms;
-}
-
-.hero-title:has(.type-caret-done) .hero-title-ai::after {
-  transform: scaleX(1);
+@keyframes shimmer-ai {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
 }
 
 .editorial-quote {

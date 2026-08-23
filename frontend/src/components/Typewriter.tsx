@@ -67,9 +67,16 @@ export function Typewriter({
   );
 
   return (
-    <Tag className={className}>
-      {rendered}
-      <span className={`type-caret ${done ? 'type-caret-done' : ''}`} aria-hidden="true" />
+    <Tag className={className} style={{ position: 'relative', display: 'inline-block' }}>
+      <span style={{ visibility: 'hidden', pointerEvents: 'none' }}>
+        {segments.map((seg, i) => (
+          <span key={i} className={seg.className}>{seg.text}</span>
+        ))}
+      </span>
+      <span style={{ position: 'absolute', inset: 0, pointerEvents: 'none', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+        {rendered}
+        <span className={`type-caret ${done ? 'type-caret-done' : ''}`} aria-hidden="true" />
+      </span>
       <span className="sr-only">{full}</span>
     </Tag>
   );
