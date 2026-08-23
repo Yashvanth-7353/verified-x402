@@ -24,9 +24,14 @@ function isLinkActive(pathname: string, link: (typeof LINKS)[number]): boolean {
   return pathname === link.to;
 }
 
+/** Scroll range (px) over which the header collapses — progress is scrubbed 1:1 with scroll position within it. */
+const NAV_COLLAPSE_RANGE = 140;
+
 export function Nav() {
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const scrolled = progress > 0;
+  const collapsed = progress >= 1;
   const location = useLocation();
   const activeIndex = LINKS.findIndex((l) => isLinkActive(location.pathname, l));
 
@@ -70,11 +75,20 @@ export function Nav() {
   }, [activeIndex, scrolled]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
+    let raf = 0;
+    const computeProgress = () => Math.min(1, Math.max(0, window.scrollY / NAV_COLLAPSE_RANGE));
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setProgress(computeProgress());
+      });
+    };
+    setProgress(computeProgress());
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
@@ -89,7 +103,10 @@ export function Nav() {
 
   return (
     <div className="dock-wrap">
-      <div className={`dock-row ${scrolled ? 'nav-scrolled' : ''}`}>
+      <div
+        className={`dock-row ${scrolled ? 'nav-scrolled' : ''} ${collapsed ? 'nav-collapsed' : ''}`}
+        style={{ ['--nav-progress' as string]: progress }}
+      >
         <Link
           to="/"
           className="dock-brand glass-strong"

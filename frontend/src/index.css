@@ -267,37 +267,49 @@ code,
 .dock-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: 1180px;
+  gap: calc(10px * (1 - var(--nav-shrink, 0)));
+  max-width: calc(220px + (1180px - 220px) * (1 - var(--nav-shrink, 0)));
   width: 100%;
   justify-content: space-between;
-  transition: max-width 420ms var(--ease), gap 420ms var(--ease);
+  /* No transition here on purpose: --nav-progress is scrubbed every scroll
+     frame via rAF in Nav.tsx, so the shrink already tracks scroll position
+     1:1. A CSS transition on top of that would fight the per-frame value
+     and reintroduce the "catching up" lag this replaced. */
+
+  /* Two-phase collapse for the row and the nav/wallet/toggle children
+     below: fully fade out over the first 45% of the scroll range while
+     still at full size, THEN shrink over the remaining 55% once invisible.
+     Shrinking the box while still visible would clip mid-word text as the
+     container narrows past the links' natural width — fading first avoids
+     that entirely. */
+  --nav-fade: clamp(0, calc((0.45 - var(--nav-progress, 0)) / 0.45), 1);
+  --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
 }
 
-.dock-row.nav-scrolled {
-  max-width: 220px;
-  gap: 0;
+/* justify-content can't be interpolated, so the switch to a truly centered
+   brand only happens once nav/wallet have fully faded and collapsed to 0
+   width below — at that point there is no free space left to distribute
+   differently, so the flip is visually imperceptible. */
+.dock-row.nav-collapsed {
   justify-content: center;
 }
 
 /* Scrolled: nav links and wallet collapse away, brand ends up alone and
-   centered. Scrolling back up reverses the same transition, so the header
+   centered. Scrolling back up reverses the same scrub, so the header
    visibly re-expands and the brand returns to its left-aligned slot. */
 .dock-nav,
 .dock-wallet,
 .dock-toggle {
-  transition: opacity 260ms var(--ease), max-width 420ms var(--ease), margin 420ms var(--ease), transform 300ms var(--ease);
-  max-width: 600px;
+  opacity: var(--nav-fade, 1);
+  max-width: calc(600px * (1 - var(--nav-shrink, 0)));
+  transform: scale(calc(1 - 0.1 * (1 - var(--nav-fade, 1))));
   overflow: hidden;
 }
 
-.nav-scrolled .dock-nav,
-.nav-scrolled .dock-wallet,
-.nav-scrolled .dock-toggle {
-  opacity: 0;
-  max-width: 0;
+.nav-collapsed .dock-nav,
+.nav-collapsed .dock-wallet,
+.nav-collapsed .dock-toggle {
   margin: 0 !important;
-  transform: scale(0.85);
   pointer-events: none;
 }
 
@@ -305,12 +317,11 @@ code,
 .dock-nav,
 .dock-toggle {
   pointer-events: auto;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(30px) saturate(190%);
-  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  background: rgba(255, 255, 255, calc(0.78 + 0.14 * var(--nav-progress, 0)));
+  backdrop-filter: blur(calc(30px + 12px * var(--nav-progress, 0))) saturate(calc(190% + 20% * var(--nav-progress, 0)));
+  -webkit-backdrop-filter: blur(calc(30px + 12px * var(--nav-progress, 0))) saturate(calc(190% + 20% * var(--nav-progress, 0)));
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 10px 32px -8px rgba(20, 22, 14, 0.1), 0 2px 6px -1px rgba(20, 22, 14, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
-  transition: background 380ms var(--ease), backdrop-filter 380ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), padding 380ms var(--ease);
 }
 
 .dock-brand {
@@ -318,12 +329,12 @@ code,
   align-items: center;
   justify-content: center;
   width: auto;
-  height: 52px;
-  padding: 0 18px;
+  height: calc(52px - 8px * var(--nav-progress, 0));
+  padding: 0 calc(18px - 4px * var(--nav-progress, 0));
   border-radius: 999px;
   flex-shrink: 0;
   text-decoration: none;
-  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), padding 380ms var(--ease), background 260ms var(--ease);
+  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease);
 }
 
 @media (max-width: 860px) {
@@ -486,30 +497,13 @@ code,
   }
 }
 
-.nav-scrolled .dock-brand,
-.nav-scrolled .dock-nav,
-.nav-scrolled .dock-toggle {
-  box-shadow: 0 16px 40px -10px rgba(20, 22, 14, 0.14), 0 3px 10px rgba(20, 22, 14, 0.05), inset 0 1px 1px 0 #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(42px) saturate(210%);
-  -webkit-backdrop-filter: blur(42px) saturate(210%);
-}
-.nav-scrolled .dock-nav {
-  padding: 4px;
-  gap: 0;
-}
-.nav-scrolled .dock-brand {
-  height: 44px;
-  padding: 0 14px;
-}
-.nav-scrolled .dock-pill {
-  top: 4px;
-  bottom: 4px;
-}
-.nav-scrolled .dock-link {
-  padding: 7px 12px;
-  font-size: 12.5px;
+/* dock-brand/dock-nav/dock-toggle background, blur, height, padding, and
+   dock-link sizing are driven continuously by --nav-progress in the base
+   rules above/below — no discrete .nav-scrolled override needed here,
+   that would fight the scrub and reintroduce a jump. */
+.dock-pill {
+  top: calc(6px - 2px * var(--nav-progress, 0));
+  bottom: calc(6px - 2px * var(--nav-progress, 0));
 }
 
 .footer-brand {
@@ -1617,8 +1611,8 @@ details.tech[open] summary {
   background: var(--glass-bg-strong);
 }
 
-.nav-scrolled {
-  box-shadow: 0 1px 0 var(--border), 0 12px 30px -18px rgba(20, 22, 14, 0.3);
+.dock-row.nav-scrolled {
+  box-shadow: 0 1px 0 var(--border), 0 12px 30px -18px rgba(20, 22, 14, calc(0.3 * var(--nav-progress, 0)));
 }
 
 .site-footer {
