@@ -11,6 +11,7 @@ class ValidationStage(str, Enum):
     syntax = "syntax"
     sql_safety = "sql_safety"
     privacy = "privacy"
+    business_logic = "business_logic"
 
 class Severity(str, Enum):
     info = "info"

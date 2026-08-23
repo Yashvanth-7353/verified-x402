@@ -20,11 +20,14 @@ class VerifyPayloadRequest(BaseModel):
 class VerifyPayloadResponse(BaseModel):
     """
     API response model for the /verify endpoint.
-    Returns only the verification result and receipt.
-    Does NOT echo the original or repaired payload.
+    Returns the verification result, receipt, and (when deterministic repair
+    was applied) the repaired_output so the frontend can display the actual
+    fixed payload alongside the original.
+    Never returns raw payment credentials.
     """
     result: VerificationResult
     receipt: VerificationReceipt
+    repaired_output: Optional[dict] = None
 
 
 class SemanticRepairRequest(BaseModel):

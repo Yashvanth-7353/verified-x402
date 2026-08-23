@@ -5,9 +5,11 @@ import { JsonView } from './JsonView';
 export function RepairCompare({
   repairInfo,
   before,
+  after,
 }: {
   repairInfo: RepairInfo;
   before: Record<string, unknown>;
+  after?: Record<string, unknown> | null;
 }) {
   const isSemantic = repairInfo.repair_type === 'semantic';
 
@@ -56,12 +58,24 @@ export function RepairCompare({
         <JsonView data={before} />
       </div>
 
-      <p style={{ fontSize: 12.5, color: 'var(--text-faint)' }}>
-        The repaired output itself isn't echoed back by the API — only its hash is, so the response never re-exposes
-        payload content it doesn't have to. The output was re-validated in full before being accepted; its integrity
-        is provable by recomputing SHA-256 over it and comparing to <code className="mono">post_repair_output_hash</code>{' '}
-        above.
-      </p>
+      {after && (
+        <div>
+          <div className="section-title">Repaired output</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginBottom: 8 }}>
+            The output after deterministic repair was applied and re-validated.
+          </p>
+          <JsonView data={after} />
+        </div>
+      )}
+
+      {!after && (
+        <p style={{ fontSize: 12.5, color: 'var(--text-faint)' }}>
+          The repaired output itself isn't echoed back by the API — only its hash is, so the response never re-exposes
+          payload content it doesn't have to. The output was re-validated in full before being accepted; its integrity
+          is provable by recomputing SHA-256 over it and comparing to <code className="mono">post_repair_output_hash</code>{' '}
+          above.
+        </p>
+      )}
     </div>
   );
 }

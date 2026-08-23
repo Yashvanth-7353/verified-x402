@@ -69,12 +69,14 @@ export function Verify() {
       schema_ref: schemaRef,
       agent_identifier: agentIdentifier,
     };
+    const activeExample = EXAMPLES.find((e) => e.id === selectedExample);
     const policy = {
       schema_id: crypto.randomUUID(),
       version: schemaVersion,
       output_type: outputType,
       schema_definition: schemaParsed.value,
       privacy_policy_ref: privacyPolicyRef,
+      ...(activeExample?.businessRules ? { business_rules: activeExample.businessRules } : {}),
     };
 
     try {
@@ -97,12 +99,21 @@ export function Verify() {
           immediately — no payment required for this step.
         </p>
 
-        <div className="section-title">Try an example</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10, marginBottom: 24 }}>
+        <div className="section-title">Try a real scenario</div>
+        <p style={{ color: 'var(--text-faint)', fontSize: 13, marginBottom: 14 }}>
+          See how Verified handles correct outputs, deterministic fixes,
+          and repairs that require semantic reasoning.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, marginBottom: 28 }}>
           {EXAMPLES.map((ex) => {
             const isActive = selectedExample === ex.id;
             const indicatorColor = ex.indicator === 'pass' ? 'var(--success)' : ex.indicator === 'warn' ? 'var(--warning)' : 'var(--danger)';
-            const indicatorIcon = ex.indicator === 'pass' ? '✓' : ex.indicator === 'warn' ? '⚠' : '✕';
+            const categoryBg = ex.category === 'VALID'
+              ? 'rgba(34,197,94,0.12)' : ex.category === 'DETERMINISTIC'
+                ? 'rgba(251,191,36,0.12)' : 'rgba(168,85,247,0.12)';
+            const categoryColor = ex.category === 'VALID'
+              ? 'var(--success)' : ex.category === 'DETERMINISTIC'
+                ? 'var(--warning)' : 'rgba(168,85,247,1)';
             return (
               <button
                 key={ex.id}
@@ -110,17 +121,24 @@ export function Verify() {
                 onClick={() => applyExample(ex.id)}
                 className="glass"
                 style={{
-                  textAlign: 'left', padding: '12px 14px', borderRadius: 10,
-                  border: `1.5px solid ${isActive ? indicatorColor : 'rgba(255,255,255,0.12)'}`,
-                  background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                  textAlign: 'left', padding: '14px 16px', borderRadius: 12,
+                  border: `1.5px solid ${isActive ? indicatorColor : 'rgba(255,255,255,0.10)'}`,
+                  background: isActive ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
                   cursor: 'pointer', transition: 'border-color 200ms, background 200ms',
+                  display: 'flex', flexDirection: 'column', gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 14, color: indicatorColor, fontWeight: 700 }}>{indicatorIcon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--grotesk)', color: 'var(--text)' }}>{ex.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700, fontFamily: 'var(--grotesk)', color: 'var(--text)' }}>{ex.label}</span>
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--grotesk)',
+                    color: categoryColor, background: categoryBg,
+                    padding: '2px 8px', borderRadius: 6, letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                  }}>{ex.category}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.4 }}>{ex.hint}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-faint)', lineHeight: 1.45 }}>{ex.description}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 'auto' }}>{ex.hint}</div>
               </button>
             );
           })}

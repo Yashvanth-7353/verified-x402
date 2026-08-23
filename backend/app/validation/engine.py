@@ -7,6 +7,7 @@ from app.models.enums import VerificationOutcome, Severity
 from app.validation.stages.base import ValidationStage
 from app.validation.stages.schema import SchemaValidationStage
 from app.validation.stages.stubs import SyntaxValidationStage, SqlSafetyValidationStage, PrivacyValidationStage
+from app.validation.stages.business_rules import BusinessRuleValidationStage
 
 class VerificationEngine:
     def __init__(self):
@@ -14,7 +15,8 @@ class VerificationEngine:
             SchemaValidationStage(),
             SyntaxValidationStage(),
             SqlSafetyValidationStage(),
-            PrivacyValidationStage()
+            PrivacyValidationStage(),
+            BusinessRuleValidationStage(),
         ]
         
     def verify_request(self, request: VerificationRequest, policy: SchemaPolicy, validator_version: str) -> VerificationResult:
