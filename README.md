@@ -1,6 +1,8 @@
 # Verified
 
-**A verifiable trust layer for AI-agent structured output.**
+**A verifiable trust layer for AI-agent.**
+
+> **Deployed Project:** **https://verified402.pages.dev/**
 
 Verified sits between an autonomous AI agent and whatever system executes what it produced. It validates structured output locally, repairs what can be repaired deterministically, escalates to paid, on-chain-settled semantic repair only when required, and issues a cryptographically signed, blockchain-anchored receipt for every outcome — pass, repair, or reject. No output is ever trusted by default, including its own repairs.
 
@@ -18,21 +20,21 @@ Verified closes that gap by acting as a mandatory, independently verifiable chec
 
 ## Design Principles
 
-| Principle | Guarantee |
-|---|---|
-| **Local-first** | Schema, type, syntax, SQL-safety, and privacy checks run entirely on-device before any data leaves the machine. |
-| **Fail-closed** | Any uncertainty, timeout, or unresolved finding resolves to `rejected`. There is no code path that defaults to `verified`. |
-| **Payment-gated escalation** | Semantic repair is never invoked without a settled x402 payment. An LLM call cannot execute without prior on-chain settlement. |
-| **Verify after repair** | A repaired candidate — deterministic or semantic — is never accepted until it passes the same validation pipeline it originally failed. |
-| **Cryptographic receipts** | Every request produces exactly one Ed25519-signed, SHA-256 hash-bound receipt, regardless of outcome. |
-| **Tamper-evident anchoring** | Only Merkle roots over batches of receipt hashes are committed on-chain — never raw payloads. |
-| **Independent verifiability** | Any receipt can be verified with a public key and a Merkle proof alone. No access to Verified's backend or database is required. |
+| Principle                     | Guarantee                                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local-first**               | Schema, type, syntax, SQL-safety, and privacy checks run entirely on-device before any data leaves the machine.                         |
+| **Fail-closed**               | Any uncertainty, timeout, or unresolved finding resolves to `rejected`. There is no code path that defaults to `verified`.              |
+| **Payment-gated escalation**  | Semantic repair is never invoked without a settled x402 payment. An LLM call cannot execute without prior on-chain settlement.          |
+| **Verify after repair**       | A repaired candidate — deterministic or semantic — is never accepted until it passes the same validation pipeline it originally failed. |
+| **Cryptographic receipts**    | Every request produces exactly one Ed25519-signed, SHA-256 hash-bound receipt, regardless of outcome.                                   |
+| **Tamper-evident anchoring**  | Only Merkle roots over batches of receipt hashes are committed on-chain — never raw payloads.                                           |
+| **Independent verifiability** | Any receipt can be verified with a public key and a Merkle proof alone. No access to Verified's backend or database is required.        |
 
 ---
 
 ## How It Works
 
-```
+```text
 Agent Output
     │
     ▼
@@ -58,7 +60,7 @@ Local Validation            schema · type · syntax · SQL-safety · privacy
         Verification Receipt               Ed25519 signature · SHA-256 hash binding
               │
               ▼
-        Local Persistence  ──batch──►  Merkle Tree  ──root──►  Algorand Anchor
+        Local Persistence                  ──batch──►  Merkle Tree  ──root──►  Algorand Anchor
               │
               ▼
         Independent Verification           public key + Merkle proof only, no backend required
@@ -70,17 +72,17 @@ A full architecture diagram is available at [`architecture.png`](./architecture.
 
 ## Technology Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, react-router-dom |
-| Backend | FastAPI (Python), Pydantic |
-| Verification engine | Deterministic multi-stage validation pipeline, rule-based repair |
-| Semantic repair | Groq (`openai/gpt-oss-20b`) |
-| Payments | x402 protocol v2, GoPlausible AVM Facilitator, Algorand TestNet, USDC |
-| Wallet integration | Pera Wallet via `@txnlab/use-wallet-react` |
-| Cryptography | Ed25519 receipt signing (PyNaCl), SHA-256 hashing |
+| Layer                 | Technology                                                                       |
+| --------------------- | -------------------------------------------------------------------------------- |
+| Frontend              | React 19, TypeScript, Vite, react-router-dom                                     |
+| Backend               | FastAPI (Python), Pydantic                                                       |
+| Verification engine   | Deterministic multi-stage validation pipeline, rule-based repair                 |
+| Semantic repair       | Groq (`openai/gpt-oss-20b`)                                                      |
+| Payments              | x402 protocol v2, GoPlausible AVM Facilitator, Algorand TestNet, USDC            |
+| Wallet integration    | Pera Wallet via `@txnlab/use-wallet-react`                                       |
+| Cryptography          | Ed25519 receipt signing (PyNaCl), SHA-256 hashing                                |
 | Integrity / anchoring | Binary Merkle tree, Algorand TestNet on-chain anchoring, Merkle inclusion proofs |
-| Persistence | SQLite (local), optional Postgres via `DATABASE_URL` |
+| Persistence           | SQLite (local), optional Postgres via `DATABASE_URL`                             |
 
 ---
 
@@ -88,18 +90,18 @@ A full architecture diagram is available at [`architecture.png`](./architecture.
 
 All endpoints are served under `settings.API_V1_STR` (default `/api/v1`).
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/verify` | Run local validation and deterministic repair on a structured output. |
-| `POST` | `/semantic-repair` | Escalate to paid semantic repair, gated by an x402 payment. |
-| `POST` | `/receipt/verify` | Independently verify a receipt's signature and hash binding. |
-| `GET` | `/receipt/public-key` | Retrieve the Ed25519 public key used for receipt verification. |
-| `POST` | `/anchor` | Batch a set of receipts, compute a Merkle root, and anchor it on Algorand. |
-| `GET` | `/anchor/proof/{record_id}` | Retrieve a Merkle inclusion proof for a specific anchored record. |
-| `GET` | `/records` | List verification records. |
-| `GET` | `/records/unanchored` | List records eligible for anchoring. |
-| `GET` | `/records/{record_id}` | Retrieve a single verification record. |
-| `GET` | `/health` | Service health check. |
+| Method | Path                        | Purpose                                                                    |
+| ------ | --------------------------- | -------------------------------------------------------------------------- |
+| `POST` | `/verify`                   | Run local validation and deterministic repair on a structured output.      |
+| `POST` | `/semantic-repair`          | Escalate to paid semantic repair, gated by an x402 payment.                |
+| `POST` | `/receipt/verify`           | Independently verify a receipt's signature and hash binding.               |
+| `GET`  | `/receipt/public-key`       | Retrieve the Ed25519 public key used for receipt verification.             |
+| `POST` | `/anchor`                   | Batch a set of receipts, compute a Merkle root, and anchor it on Algorand. |
+| `GET`  | `/anchor/proof/{record_id}` | Retrieve a Merkle inclusion proof for a specific anchored record.          |
+| `GET`  | `/records`                  | List verification records.                                                 |
+| `GET`  | `/records/unanchored`       | List records eligible for anchoring.                                       |
+| `GET`  | `/records/{record_id}`      | Retrieve a single verification record.                                     |
+| `GET`  | `/health`                   | Service health check.                                                      |
 
 Full request/response schemas are documented in [`docs/API.md`](./docs/API.md).
 
@@ -107,7 +109,7 @@ Full request/response schemas are documented in [`docs/API.md`](./docs/API.md).
 
 ## Project Structure
 
-```
+```text
 verified-x402/
 ├── backend/            FastAPI application, verification engine, x402 integration
 │   ├── app/
@@ -134,7 +136,7 @@ verified-x402/
 
 ### Backend
 
-```
+```bash
 cd backend
 pip install -r requirements.txt
 cp .env.example .env        # populate AVM_ADDRESS and GROQ_API_KEY
@@ -146,7 +148,7 @@ The API is served at `http://localhost:8000`, with interactive documentation at 
 
 ### Frontend
 
-```
+```bash
 cd frontend
 npm install
 cp .env.example .env        # set VITE_API_BASE_URL to the backend origin
@@ -155,7 +157,7 @@ npm run dev
 
 ### Tests
 
-```
+```bash
 cd backend
 pytest
 ```
@@ -172,20 +174,20 @@ The backend deploys to Render as a Python web service (`render.yaml`), with heal
 
 Verified's threat model, key management approach, and failure-mode analysis are documented in [`docs/THREAT_MODEL.md`](./docs/THREAT_MODEL.md). At a high level:
 
-- Private keys used for receipt signing and Algorand transactions never leave the backend environment.
-- Payment authorization is signed client-side by the user's own wallet; no private key is ever transmitted to or handled by Verified.
-- Anchored data is limited to Merkle roots — raw payloads are never committed on-chain.
-- Every verification outcome, including rejections, is receipted and auditable.
+* Private keys used for receipt signing and Algorand transactions never leave the backend environment.
+* Payment authorization is signed client-side by the user's own wallet; no private key is ever transmitted to or handled by Verified.
+* Anchored data is limited to Merkle roots — raw payloads are never committed on-chain.
+* Every verification outcome, including rejections, is receipted and auditable.
 
 ---
 
 ## Use Cases
 
-- **AI financial agents** — validating payment instructions before execution, with a signed audit trail.
-- **Procurement agents** — enforcing structural and semantic correctness on purchase orders before they reach downstream systems.
-- **Multi-agent pipelines** — establishing a trust boundary at the handoff between agents.
-- **AI-driven API execution** — validating generated request payloads against a schema before dispatch.
-- **Auditable AI decisions** — producing a cryptographically verifiable, timestamped record of AI-driven decisions for later independent review.
+* **AI financial agents** — validating payment instructions before execution, with a signed audit trail.
+* **Procurement agents** — enforcing structural and semantic correctness on purchase orders before they reach downstream systems.
+* **Multi-agent pipelines** — establishing a trust boundary at the handoff between agents.
+* **AI-driven API execution** — validating generated request payloads against a schema before dispatch.
+* **Auditable AI decisions** — producing a cryptographically verifiable, timestamped record of AI-driven decisions for later independent review.
 
 ---
 
@@ -193,6 +195,6 @@ Verified's threat model, key management approach, and failure-mode analysis are 
 
 The architecture generalizes past this specific pipeline:
 
-- **Payment-gated inference** — the x402-gated escalation pattern applies to any pay-per-verification or pay-per-inference API, not only semantic repair.
-- **Chain-agnostic anchoring** — the Merkle-batch anchoring model is not tied to Algorand and ports to any settlement layer with low-cost, fast finality.
-- **Enterprise trust layer** — a drop-in verification boundary for organizations deploying autonomous agents against production systems, where auditability is a compliance requirement rather than an optional feature.
+* **Payment-gated inference** — the x402-gated escalation pattern applies to any pay-per-verification or pay-per-inference API, not only semantic repair.
+* **Chain-agnostic anchoring** — the Merkle-batch anchoring model is not tied to Algorand and ports to any settlement layer with low-cost, fast finality.
+* **Enterprise trust layer** — a drop-in verification boundary for organizations deploying autonomous agents against production systems, where auditability is a compliance requirement rather than an optional feature.
