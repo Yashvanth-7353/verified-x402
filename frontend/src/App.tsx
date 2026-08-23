@@ -9,6 +9,7 @@ import { RouteProgressBar } from './components/RouteProgressBar';
 import { ToastProvider } from './lib/toast';
 import { attachRippleListener } from './lib/ripple';
 import { CustomCursor } from './components/CustomCursor';
+import { Preloader } from './components/Preloader';
 import { Home } from './pages/Home';
 import { Verify } from './pages/Verify';
 import { Result } from './pages/Result';
@@ -58,13 +59,15 @@ function App() {
   useEffect(() => attachRippleListener(), []);
 
   return (
-    <ToastProvider>
-      <AlgoKitWalletProvider manager={walletManager}>
-        <HashRouter>
-          <AppShell />
-        </HashRouter>
-      </AlgoKitWalletProvider>
-    </ToastProvider>
+    <Preloader>
+      <ToastProvider>
+        <AlgoKitWalletProvider manager={walletManager}>
+          <HashRouter>
+            <AppShell />
+          </HashRouter>
+        </AlgoKitWalletProvider>
+      </ToastProvider>
+    </Preloader>
   );
 }
 

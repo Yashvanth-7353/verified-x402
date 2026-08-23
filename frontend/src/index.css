@@ -3,7 +3,11 @@
    Single light theme. Trust-infrastructure aesthetic: quiet, precise, technical.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Quicksand:wght@500;600;700&family=Homemade+Apple&family=Akronim&display=swap');
+/* Google Fonts are loaded via <link> tags in index.html, not @import here —
+   @import is render-blocking and only discovered after this stylesheet is
+   fetched and parsed, so the browser starts the font request a full
+   round-trip later than it needs to. A <link> in <head> is discovered
+   immediately during HTML parsing. */
 
 :root {
   /* Ledger paper — cool, not the warm-cream AI default */
@@ -2333,3 +2337,31 @@ details.tech[open] summary {
 * { cursor: none !important; }
 
 a, button, [role="button"], input, select, textarea { cursor: none !important; }
+
+/* ---------- preloader ---------- */
+
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  opacity: 1;
+  transition: opacity 320ms var(--ease);
+}
+
+.preloader-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader-mark {
+  animation: preloader-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes preloader-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1); }
+}

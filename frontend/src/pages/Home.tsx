@@ -222,8 +222,8 @@ function FeatureVisual({ kind }: { kind: string }) {
 
 export function Home() {
   const log = useMemo(() => loadSessionLog(), []);
-  const [sealRef, sealOffset] = useParallax<HTMLDivElement>(0.06);
-  const [guillocheRef, guillocheOffset] = useParallax<HTMLDivElement>(0.02);
+  const sealRef = useParallax<HTMLDivElement>(0.06);
+  const guillocheRef = useParallax<HTMLDivElement>(0.02);
 
   return (
     <div className="page-anim">
@@ -237,7 +237,7 @@ export function Home() {
           alignItems: 'center',
         }}
       >
-        <div ref={guillocheRef} className="parallax" style={{ position: 'absolute', inset: 0, transform: `translateY(${guillocheOffset}px)` }}>
+        <div ref={guillocheRef} className="parallax" style={{ position: 'absolute', inset: 0, willChange: 'transform' }}>
           <Guilloche />
         </div>
         <div className="hero-particles">
@@ -288,8 +288,8 @@ export function Home() {
               flexShrink: 0,
               borderRadius: '50%',
               padding: 28,
-              transform: `translateY(${sealOffset}px)`,
               position: 'relative',
+              willChange: 'transform',
             }}
           >
             <div className="seal-glow" />

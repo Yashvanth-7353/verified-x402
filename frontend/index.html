@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Verified</title>
     <meta name="description" content="Trust layer for AI-generated structured outputs — validate, repair, prove, anchor." />
+    <!-- Discovered immediately during HTML parsing, unlike a CSS @import
+         (which waits for the stylesheet that contains it to be fetched and
+         parsed first) — this is what actually shortens time-to-first-paint
+         for text. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Quicksand:wght@500;600;700&family=Homemade+Apple&family=Akronim&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

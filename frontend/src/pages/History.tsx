@@ -200,8 +200,16 @@ export function History() {
                       {filteredServer.map((r) => (
                         <tr
                           key={r.record_id}
+                          role="button"
+                          tabIndex={0}
                           style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                           onClick={() => navigateToRecord(r.record_id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              navigateToRecord(r.record_id);
+                            }
+                          }}
                         >
                           <td style={{ padding: '12px 16px' }}>
                             <OutcomeBadge outcome={r.outcome} />
@@ -299,7 +307,15 @@ export function History() {
                     {filteredSession.map((e) => (
                       <tr
                         key={e.receipt_id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => navigateToVerify(e.receipt)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === 'Enter' || ev.key === ' ') {
+                            ev.preventDefault();
+                            navigateToVerify(e.receipt);
+                          }
+                        }}
                         style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                       >
                         <td style={{ padding: '12px 16px', fontSize: 13.5 }}>{e.agent_identifier}</td>

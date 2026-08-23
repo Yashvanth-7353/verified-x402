@@ -29,10 +29,17 @@ export function useReveal<T extends HTMLElement>(threshold = 0.16) {
 const reducedMotion =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-/** Scroll-linked parallax offset for an element, expressed as a translateY in px. */
+/** Scroll-linked parallax translateY, applied directly to the element's own
+ *  style rather than through React state. Driving this via setState meant
+ *  every scroll pixel forced a getBoundingClientRect() layout read *and* a
+ *  re-render of the whole page component that owns the ref — with two of
+ *  these hooks active on the same page, each scroll frame did two forced
+ *  layouts interleaved with two re-renders, a textbook layout-thrash that
+ *  made scrolling feel janky. Mutating the node's transform directly skips
+ *  React entirely, so a scroll frame costs one layout read + one style
+ *  write per hook, with no reconciliation in between. */
 export function useParallax<T extends HTMLElement>(strength = 0.15) {
   const nodeRef = useRef<T | null>(null);
-  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     const el = nodeRef.current;
@@ -43,7 +50,7 @@ export function useParallax<T extends HTMLElement>(strength = 0.15) {
       raf = 0;
       const rect = el.getBoundingClientRect();
       const center = rect.top + rect.height / 2 - window.innerHeight / 2;
-      setOffset(center * -strength);
+      el.style.transform = `translateY(${center * -strength}px)`;
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -58,5 +65,5 @@ export function useParallax<T extends HTMLElement>(strength = 0.15) {
     };
   }, [strength]);
 
-  return [nodeRef, offset] as const;
+  return nodeRef;
 }

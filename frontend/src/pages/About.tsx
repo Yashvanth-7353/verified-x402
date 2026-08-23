@@ -3,15 +3,6 @@ import { Guilloche, VerificationSeal } from '../components/VerificationSeal';
 import { Reveal } from '../components/Reveal';
 import { Typewriter } from '../components/Typewriter';
 
-const PRINCIPLES = [
-  { title: 'Local-first', body: 'Validation, schema/type checks, and deterministic repair run entirely on-device before anything is sent anywhere.' },
-  { title: 'Fail-closed', body: 'Any uncertainty, failure, or unresolved issue resolves to rejected — never a default "verified".' },
-  { title: 'Payment-gated escalation', body: 'Semantic repair is never invoked without a settled x402 payment via the GoPlausible AVM facilitator on Algorand TestNet.' },
-  { title: 'Verify after repair', body: 'A repaired candidate — deterministic or semantic — is never accepted until it passes the same validation pipeline again.' },
-  { title: 'Cryptographic receipts', body: 'Every request produces exactly one Ed25519-signed, hash-bound receipt, regardless of outcome.' },
-  { title: 'Tamper-evident anchoring', body: 'Only Merkle roots over batches of receipt hashes are committed to Algorand — never raw payloads.' },
-];
-
 const TECH_STACK = [
   {
     category: 'Frontend',
@@ -138,56 +129,15 @@ export function About() {
           </div>
         </section>
 
-        {/* Core principles */}
-        <Reveal>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Core principles</div>
-        </Reveal>
-        <div className="bento" style={{ marginBottom: 40 }}>
-          {PRINCIPLES.map((p, i) => (
-            <Reveal key={p.title} delay={i * 60}>
-              <div className="span-6 card card-pad">
-                <h3 style={{ fontSize: 16, marginBottom: 6 }}>{p.title}</h3>
-                <p style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>{p.body}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-
         {/* Architecture */}
         <Reveal>
           <div className="card card-pad" style={{ marginBottom: 24 }}>
             <div className="section-title">Architecture</div>
-            <pre className="json-block" style={{ fontFamily: 'var(--mono)', lineHeight: 1.7, overflow: 'auto' }}>
-{`Agent Output
-    |
-    v
-Local Validation  (schema · type · syntax · SQL-safety · privacy)
-    |
-    +-- deterministic fix? --> Deterministic Repair --> Re-validate
-    |
-    +-- still blocked, eligible for escalation?
-              |
-              v
-        x402 Payment Required  (HTTP 402)
-              |
-              v
-        GoPlausible Facilitator  -->  Algorand TestNet (settle 1 USDC)
-              |
-              v
-        Groq Semantic Repair  (openai/gpt-oss-20b)
-              |
-              v
-        Re-validation  (same engine — LLM output is never trusted directly)
-              |
-              v
-        Verification Receipt  (Ed25519-signed, SHA-256 hash-bound)
-              |
-              v
-        SQLite Persistence  --batch-->  Merkle Tree  --root-->  Algorand Anchor
-              |
-              v
-        Independent Verification  (public key only — no backend required)`}
-            </pre>
+            <img
+              src="/architecture.png"
+              alt="Verified receipt architecture: an AI agent's structured output passes through the FastAPI backend's verification pipeline, x402 payment escalation, receipt generation, and Merkle anchoring on Algorand, ending in independent receipt verification."
+              style={{ width: '100%', height: 'auto', borderRadius: 12, display: 'block' }}
+            />
           </div>
         </Reveal>
 

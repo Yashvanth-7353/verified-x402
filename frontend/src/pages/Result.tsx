@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { semanticRepair as callSemanticRepair, verifyReceipt } from '../api/client';
@@ -53,35 +53,31 @@ export function Result() {
 
   const paymentMeta = response && 'payment_metadata' in response ? response.payment_metadata : null;
 
-  // Log to session only when the receipt ID actually changes (not on initial render).
-  // This prevents logging the intermediate 'rejected' state before payment,
-  // ensuring the session log shows only the final outcome.
-  const initialReceiptIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!state || !response) return;
-    const currentReceiptId = response.receipt.receipt_id;
-    // Skip the first render — we don't want to log the initial (pre-payment) state
-    if (initialReceiptIdRef.current === null) {
-      initialReceiptIdRef.current = currentReceiptId;
-      return;
-    }
-    // Only log when the receipt ID actually changes (e.g., after repair)
-    if (initialReceiptIdRef.current !== currentReceiptId) {
-      initialReceiptIdRef.current = currentReceiptId;
-      appendSessionEntry({
-        logged_at: new Date().toISOString(),
-        request_id: state.request.request_id,
-        agent_identifier: state.request.agent_identifier,
-        outcome: response.result.outcome,
-        receipt_id: currentReceiptId,
-        receipt_hash: response.receipt.receipt_hash,
-        had_payment: Boolean(paymentMeta),
-        result: response.result,
-        receipt: response.receipt,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response?.receipt.receipt_id]);
+  // Log to session only when the receipt ID actually changes from the
+  // initial (pre-payment) one — e.g. after a repair or payment completes.
+  // Called directly from onEscalate/onPay right after setResponse, since
+  // those are the only two places a new receipt can appear; reacting to
+  // it via an effect on response.receipt.receipt_id needed an extra
+  // "skip the first render" special case to avoid logging the initial
+  // state, which this avoids entirely.
+  const loggedReceiptIdRef = useRef<string | null>(state?.response?.receipt.receipt_id ?? null);
+  const logIfChanged = (paid: VerifyResponse | SemanticRepairResponse) => {
+    if (!state) return;
+    const currentReceiptId = paid.receipt.receipt_id;
+    if (loggedReceiptIdRef.current === currentReceiptId) return;
+    loggedReceiptIdRef.current = currentReceiptId;
+    appendSessionEntry({
+      logged_at: new Date().toISOString(),
+      request_id: state.request.request_id,
+      agent_identifier: state.request.agent_identifier,
+      outcome: paid.result.outcome,
+      receipt_id: currentReceiptId,
+      receipt_hash: paid.receipt.receipt_hash,
+      had_payment: Boolean('payment_metadata' in paid ? paid.payment_metadata : null),
+      result: paid.result,
+      receipt: paid.receipt,
+    });
+  };
 
   const stages = useMemo<Stage[]>(() => {
     if (!response) return [];
@@ -171,6 +167,7 @@ export function Result() {
     try {
       const paid = await callSemanticRepair({ request, policy });
       setResponse(paid);
+      logIfChanged(paid);
     } catch (e) {
       if (e instanceof ApiError && e.status === 402) {
         setChallenge(e.challenge ?? null);
@@ -222,6 +219,7 @@ export function Result() {
 
       setPaymentState('settled');
       setResponse(paid);
+      logIfChanged(paid);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Payment failed';
 
