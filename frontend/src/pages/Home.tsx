@@ -257,16 +257,9 @@ export function Home() {
         </div>
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', position: 'relative' }}>
           <div style={{ maxWidth: 640 }}>
-            <span className="eyebrow glass-pill glass" style={{ marginBottom: 18, display: 'inline-flex' }}>
-              <Typewriter
-                segments={[{ text: 'Local-first · fail-closed · on Algorand' }]}
-                speed={22}
-                startDelay={100}
-              />
-            </span>
             <Typewriter
               as="h1"
-              startDelay={900}
+              startDelay={200}
               speed={26}
               className="hero-title"
               segments={[
@@ -283,7 +276,7 @@ export function Home() {
               <Typewriter
                 segments={[{ text: 'Cryptographically bound. Merkle anchored. Fails closed.' }]}
                 speed={20}
-                startDelay={2400}
+                startDelay={1300}
               />
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 30, flexWrap: 'wrap' }}>
@@ -293,20 +286,6 @@ export function Home() {
               <Link to="/about" className="btn btn-ghost glass">
                 How it works
               </Link>
-            </div>
-            <div className="trust-badges">
-              <span className="trust-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Ed25519 Signed
-              </span>
-              <span className="trust-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                Algorand Anchored
-              </span>
-              <span className="trust-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                Fails Closed
-              </span>
             </div>
           </div>
           <div
@@ -334,7 +313,7 @@ export function Home() {
         <div className="invariant-grid">
           {FEATURES.map((f, i) => (
             <Reveal key={f.title} delay={i * 80}>
-              <div className="card glass card-pad invariant-card">
+              <div className="invariant-card">
                 <FeatureVisual kind={f.visual} />
                 <div className="invariant-number mono">{f.eyebrow}</div>
                 <h2 style={{ fontSize: 'var(--fs-lg)', margin: '8px 0 8px' }}>{f.title}</h2>

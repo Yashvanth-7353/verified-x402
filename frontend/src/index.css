@@ -1736,7 +1736,8 @@ details.tech[open] summary {
 .invariant-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
+  align-items: stretch;
+  gap: 32px;
 }
 
 @media (min-width: 860px) {
@@ -1746,13 +1747,13 @@ details.tech[open] summary {
 }
 
 .invariant-card {
-  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+  height: 100%;
+  padding: 4px 4px 0;
+  transition: transform 0.3s var(--ease);
 }
 
 .invariant-card:hover {
   transform: translateY(-4px);
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-md);
 }
 
 .invariant-card .feature-visual {

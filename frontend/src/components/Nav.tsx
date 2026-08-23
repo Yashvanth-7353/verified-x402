@@ -24,8 +24,12 @@ function isLinkActive(pathname: string, link: (typeof LINKS)[number]): boolean {
   return pathname === link.to;
 }
 
-/** Scroll range (px) over which the header collapses — progress is scrubbed 1:1 with scroll position within it. */
-const NAV_COLLAPSE_RANGE = 140;
+/** Scroll range (px) over which the header collapses. Wide on purpose — it
+ *  should take a good, deliberate scroll before the header is fully minimized. */
+const NAV_COLLAPSE_RANGE = 420;
+/** How quickly the displayed progress eases toward the scroll-derived target
+ *  each frame (0..1, lower = slower/smoother, more of a lagging "catch up" feel). */
+const NAV_EASE = 0.05;
 
 export function Nav() {
   const [open, setOpen] = useState(false);
@@ -75,22 +79,42 @@ export function Nav() {
   }, [activeIndex, scrolled]);
 
   useEffect(() => {
+    const targetProgress = () => Math.min(1, Math.max(0, window.scrollY / NAV_COLLAPSE_RANGE));
+    let current = targetProgress();
+    setProgress(current);
+
     let raf = 0;
-    const computeProgress = () => Math.min(1, Math.max(0, window.scrollY / NAV_COLLAPSE_RANGE));
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        setProgress(computeProgress());
-      });
+    let running = false;
+
+    const step = () => {
+      const target = targetProgress();
+      const next = current + (target - current) * NAV_EASE;
+      if (Math.abs(target - next) < 0.0008) {
+        current = target;
+        setProgress(current);
+        running = false;
+        return; // converged — loop stops until the next scroll/resize kicks it off again
+      }
+      current = next;
+      setProgress(current);
+      raf = requestAnimationFrame(step);
     };
-    setProgress(computeProgress());
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+
+    const ensureRunning = () => {
+      if (running) return;
+      running = true;
+      raf = requestAnimationFrame(step);
+    };
+
+    window.addEventListener('scroll', ensureRunning, { passive: true });
+    window.addEventListener('resize', ensureRunning);
+    ensureRunning();
+
     return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', ensureRunning);
+      window.removeEventListener('resize', ensureRunning);
     };
   }, []);
 
