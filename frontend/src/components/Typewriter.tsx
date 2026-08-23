@@ -35,27 +35,47 @@ export function Typewriter({
 
   useEffect(() => {
     if (reducedMotion) return;
-    let i = 0;
-    let timer: ReturnType<typeof setTimeout>;
+    setCount(0);
+    setDone(false);
+    if (full.length === 0) {
+      setDone(true);
+      onDone?.();
+      return;
+    }
 
-    const typingBudget = Math.max(0, maxDuration - startDelay);
-    const effectiveSpeed = full.length > 0 ? Math.min(speed, typingBudget / full.length) : speed;
+    // Frame-driven (not chained setTimeouts) so the reveal is paced by
+    // elapsed wall-clock time each frame — immune to setTimeout drift/
+    // throttling, which is what makes chained-timer typewriters feel
+    // jittery instead of a smooth, evenly-paced sweep.
+    const typingBudget = Math.max(1, maxDuration - startDelay);
+    const perCharDuration = Math.min(speed, typingBudget / full.length);
+    const totalTypingDuration = perCharDuration * full.length;
 
-    const tick = () => {
-      i += 1;
-      setCount(i);
-      if (i >= full.length) {
+    let raf = 0;
+    let cancelled = false;
+    const start = performance.now() + startDelay;
+
+    const frame = (now: number) => {
+      if (cancelled) return;
+      const elapsed = now - start;
+      if (elapsed < 0) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      const next = Math.min(full.length, Math.ceil((elapsed / totalTypingDuration) * full.length));
+      setCount(next);
+      if (next >= full.length) {
         setDone(true);
         onDone?.();
         return;
       }
-      timer = setTimeout(tick, effectiveSpeed);
+      raf = requestAnimationFrame(frame);
     };
+    raf = requestAnimationFrame(frame);
 
-    const startTimer = setTimeout(tick, startDelay);
     return () => {
-      clearTimeout(startTimer);
-      clearTimeout(timer);
+      cancelled = true;
+      cancelAnimationFrame(raf);
     };
     // Re-run only if the target text actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
