@@ -272,13 +272,6 @@ export function Home() {
               A local-first verification layer that validates, repairs, re-validates, signs, persists, and anchors
               AI-generated outputs — so downstream systems never have to trust blindly.
             </p>
-            <div style={{ marginTop: 12, minHeight: 24, fontSize: 'var(--fs-sm)', color: 'var(--text-faint)' }}>
-              <Typewriter
-                segments={[{ text: 'Cryptographically bound. Merkle anchored. Fails closed.' }]}
-                speed={20}
-                startDelay={1300}
-              />
-            </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 30, flexWrap: 'wrap' }}>
               <Link to="/verify" className="btn btn-accent">
                 Verify an output →
@@ -389,15 +382,12 @@ export function Home() {
             const color = USE_CASE_TONE_VAR[uc.tone];
             return (
               <Reveal key={uc.title} delay={i * 60}>
-                <div className="card card-pad use-case-card" style={{ ['--uc-tone' as string]: color }}>
+                <div className="card card-pad use-case-card" style={{ ['--uc-tone' as string]: color, alignItems: 'center' }}>
                   <div className="use-case-icon">
                     <span className="use-case-icon-ring" style={{ animationDelay: `${i * 0.4}s` }} />
                     <uc.icon width={22} height={22} />
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: 16, marginBottom: 4 }}>{uc.title}</h3>
-                    <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.45 }}>{uc.body}</p>
-                  </div>
+                  <h3 style={{ fontSize: 16 }}>{uc.title}</h3>
                 </div>
               </Reveal>
             );

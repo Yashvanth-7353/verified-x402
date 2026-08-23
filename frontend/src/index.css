@@ -267,36 +267,26 @@ code,
 .dock-row {
   display: flex;
   align-items: center;
-  gap: calc(10px * (1 - var(--nav-shrink, 0)));
-  max-width: calc(220px + (1180px - 220px) * (1 - var(--nav-shrink, 0)));
+  gap: 10px;
+  max-width: 1180px;
   width: 100%;
   justify-content: space-between;
-  /* No transition here on purpose: --nav-progress is scrubbed every scroll
-     frame via rAF in Nav.tsx, so the shrink already tracks scroll position
-     1:1. A CSS transition on top of that would fight the per-frame value
-     and reintroduce the "catching up" lag this replaced. */
+  /* The row itself no longer shrinks or re-centers — only the nav/wallet/
+     toggle children below collapse away, so the brand stays pinned to the
+     left edge the whole time instead of drifting toward center. */
 
-  /* Two-phase collapse for the row and the nav/wallet/toggle children
-     below: fully fade out over the first 45% of the scroll range while
-     still at full size, THEN shrink over the remaining 55% once invisible.
-     Shrinking the box while still visible would clip mid-word text as the
-     container narrows past the links' natural width — fading first avoids
-     that entirely. */
+  /* Two-phase collapse for the nav/wallet/toggle children below: fully
+     fade out over the first 45% of the scroll range while still at full
+     size, THEN shrink over the remaining 55% once invisible. Shrinking
+     the box while still visible would clip mid-word text as the
+     container narrows past the links' natural width — fading first
+     avoids that entirely. */
   --nav-fade: clamp(0, calc((0.45 - var(--nav-progress, 0)) / 0.45), 1);
   --nav-shrink: clamp(0, calc((var(--nav-progress, 0) - 0.45) / 0.55), 1);
 }
 
-/* justify-content can't be interpolated, so the switch to a truly centered
-   brand only happens once nav/wallet have fully faded and collapsed to 0
-   width below — at that point there is no free space left to distribute
-   differently, so the flip is visually imperceptible. */
-.dock-row.nav-collapsed {
-  justify-content: center;
-}
-
-/* Scrolled: nav links and wallet collapse away, brand ends up alone and
-   centered. Scrolling back up reverses the same scrub, so the header
-   visibly re-expands and the brand returns to its left-aligned slot. */
+/* Scrolled: nav links and wallet collapse away; the brand stays put at
+   the left. Scrolling back up reverses the same scrub. */
 .dock-nav,
 .dock-wallet,
 .dock-toggle {
