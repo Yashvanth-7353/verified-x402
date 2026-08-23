@@ -58,6 +58,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[
+        "payment-required", "PAYMENT-REQUIRED",
+        "payment-response", "PAYMENT-RESPONSE",
+        "x-payment-response", "X-PAYMENT-RESPONSE",
+    ],
 )
 logger.info("CORS allowed origins: %s", _allowed_origins)
 
@@ -131,6 +136,15 @@ def _cors_json_response(request: Request, content: Any, status_code: int, header
     resp.headers["access-control-allow-credentials"] = "true"
     resp.headers["access-control-allow-methods"] = "*"
     resp.headers["access-control-allow-headers"] = "*"
+    # The x402 challenge (and settlement result) travel in custom response
+    # headers. Browsers only expose "simple" headers to fetch() JS by default
+    # ("payment-required", "payment-response" etc. are NOT simple headers) —
+    # without this, res.headers.get('payment-required') always returns null
+    # client-side even though curl/servers see it fine.
+    resp.headers["access-control-expose-headers"] = (
+        "payment-required, PAYMENT-REQUIRED, payment-response, PAYMENT-RESPONSE, "
+        "x-payment-response, X-PAYMENT-RESPONSE"
+    )
     return resp
 
 
@@ -198,6 +212,10 @@ def _verified_payment_middleware(
                 )
                 origin = request.headers.get("origin", "*")
                 resp.headers["access-control-allow-origin"] = origin
+                resp.headers["access-control-expose-headers"] = (
+                    "payment-required, PAYMENT-REQUIRED, payment-response, PAYMENT-RESPONSE, "
+                    "x-payment-response, X-PAYMENT-RESPONSE"
+                )
                 return resp
             return _cors_json_response(
                 request,
@@ -250,6 +268,10 @@ def _verified_payment_middleware(
             # Merge settlement headers into the response
             headers = dict(response.headers)
             headers.update(settle_result.headers)
+            headers["access-control-expose-headers"] = (
+                "payment-required, PAYMENT-REQUIRED, payment-response, PAYMENT-RESPONSE, "
+                "x-payment-response, X-PAYMENT-RESPONSE"
+            )
 
             return Response(
                 content=body,

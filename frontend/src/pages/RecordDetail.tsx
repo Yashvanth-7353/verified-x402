@@ -118,7 +118,7 @@ export function RecordDetail() {
   if (record.repair_type && record.repair_type !== 'none') {
     timelineSteps.push({ label: 'Repair type', detail: record.repair_type, active: true });
   }
-  if (record.payment_status && record.payment_status !== 'none') {
+  if (record.payment_status) {
     timelineSteps.push({ label: 'Payment status', detail: record.payment_status, active: record.payment_status === 'settled' });
   }
   timelineSteps.push({ label: 'Anchoring status', detail: record.anchoring_status, active: isAnchored });

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Guilloche, VerificationSeal } from '../components/VerificationSeal';
 import { Reveal } from '../components/Reveal';
@@ -7,14 +7,65 @@ import { useParallax } from '../lib/useReveal';
 import { useTilt } from '../lib/useTilt';
 import { loadSessionLog } from '../lib/session';
 import { relativeTime } from '../lib/format';
+import {
+  BoltIcon, PackageIcon, LinkIcon, PlugIcon, ClipboardIcon,
+  ScanCheckIcon, WrenchIcon, RefreshIcon, StampIcon, AnchorGlyphIcon,
+} from '../components/icons';
 
 const STEPS = [
-  { title: 'Validate', body: 'Schema, type, syntax, SQL-safety and privacy checks run locally — nothing leaves the device yet.' },
-  { title: 'Repair', body: 'Fixable issues are corrected by bounded, rule-based repair, or escalated to paid semantic repair if not.' },
-  { title: 'Re-validate', body: 'Every repair — deterministic or semantic — is run back through the same pipeline. Nothing is trusted blindly.' },
-  { title: 'Prove', body: 'A cryptographically bound, Ed25519-signed receipt is issued for every outcome — pass, repair, or reject.' },
-  { title: 'Anchor', body: 'Receipts are batched into a Merkle tree; only the root is committed to Algorand — never the raw payload.' },
-];
+  {
+    title: 'Validate',
+    body: 'Schema, type, syntax, SQL-safety and privacy checks run locally — nothing leaves the device yet.',
+    icon: ScanCheckIcon,
+    tone: 'accent',
+  },
+  {
+    title: 'Repair',
+    body: 'Fixable issues are corrected by bounded, rule-based repair, or escalated to paid semantic repair if not.',
+    icon: WrenchIcon,
+    tone: 'seal',
+  },
+  {
+    title: 'Re-validate',
+    body: 'Every repair — deterministic or semantic — is run back through the same pipeline. Nothing is trusted blindly.',
+    icon: RefreshIcon,
+    tone: 'accent',
+  },
+  {
+    title: 'Prove',
+    body: 'A cryptographically bound, Ed25519-signed receipt is issued for every outcome — pass, repair, or reject.',
+    icon: StampIcon,
+    tone: 'accent-strong',
+  },
+  {
+    title: 'Anchor',
+    body: 'Receipts are batched into a Merkle tree; only the root is committed to Algorand — never the raw payload.',
+    icon: AnchorGlyphIcon,
+    tone: 'success',
+  },
+] as const;
+
+const PIPE_TONE_VAR: Record<string, string> = {
+  accent: 'var(--accent)',
+  'accent-strong': 'var(--accent-strong)',
+  seal: 'var(--seal)',
+  success: 'var(--success)',
+};
+
+/** Animated connector between pipeline stages — a traveling signal pulse. */
+function PipeLink({ color }: { color: string }) {
+  return (
+    <div className="pipe-link" aria-hidden="true">
+      <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
+        <line x1="2" y1="12" x2="46" y2="12" stroke={color} strokeWidth="1.5" strokeDasharray="1 5.5" strokeLinecap="round" opacity="0.55" />
+        <circle r="2.6" fill={color}>
+          <animateMotion dur="1.6s" repeatCount="indefinite" path="M2,12 L46,12" />
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="1.6s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
+}
 
 const FEATURES = [
   {
@@ -38,12 +89,20 @@ const FEATURES = [
 ];
 
 const USE_CASES = [
-  { icon: '⚡', title: 'AI Financial Agent', body: 'Validates payment instructions before execution.' },
-  { icon: '📦', title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.' },
-  { icon: '🔗', title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.' },
-  { icon: '🔌', title: 'AI API Execution', body: 'Validates API requests before they are sent.' },
-  { icon: '📋', title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.' },
-];
+  { icon: BoltIcon, title: 'AI Financial Agent', body: 'Validates payment instructions before execution.', tone: 'accent' },
+  { icon: PackageIcon, title: 'Procurement Agent', body: 'Verifies purchase orders for structural completeness.', tone: 'seal' },
+  { icon: LinkIcon, title: 'Multi-Agent Systems', body: 'Provides a trust boundary between agents.', tone: 'success' },
+  { icon: PlugIcon, title: 'AI API Execution', body: 'Validates API requests before they are sent.', tone: 'accent-strong' },
+  { icon: ClipboardIcon, title: 'Auditable AI', body: 'Generates signed, timestamped receipts for decisions.', tone: 'warning' },
+] as const;
+
+const USE_CASE_TONE_VAR: Record<string, string> = {
+  accent: 'var(--accent)',
+  'accent-strong': 'var(--accent-strong)',
+  seal: 'var(--seal)',
+  success: 'var(--success)',
+  warning: 'var(--warning)',
+};
 
 const TECH = [
   { label: 'FastAPI', desc: 'Backend API' },
@@ -58,8 +117,12 @@ const TECH = [
   { label: 'Pera Wallet', desc: 'Browser signing' },
 ];
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 function FeatureVisual({ kind }: { kind: string }) {
   const { nodeRef, onMouseMove, onMouseLeave } = useTilt<HTMLDivElement>(6);
+  const loop = !prefersReducedMotion;
 
   if (kind === 'seal-reject') {
     return (
@@ -70,7 +133,26 @@ function FeatureVisual({ kind }: { kind: string }) {
         className="feature-visual glass tilt-card"
         style={{ background: 'linear-gradient(160deg, var(--danger-bg), transparent)' }}
       >
-        <VerificationSeal outcome="rejected" size={104} />
+        <svg width="118" height="118" viewBox="0 0 130 130" style={{ position: 'absolute' }} aria-hidden="true">
+          <defs>
+            <linearGradient id="radarFade" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="var(--danger)" stopOpacity="0" />
+            </linearGradient>
+            <clipPath id="radarClip">
+              <circle cx="65" cy="65" r="58" />
+            </clipPath>
+          </defs>
+          <circle cx="65" cy="65" r="58" fill="none" stroke="var(--danger-border)" strokeWidth="1" opacity="0.5" />
+          <g clipPath="url(#radarClip)">
+            <path d="M65,65 L65,7 A58,58 0 0,1 113,42 Z" fill="url(#radarFade)">
+              {loop && (
+                <animateTransform attributeName="transform" type="rotate" from="0 65 65" to="360 65 65" dur="3.4s" repeatCount="indefinite" />
+              )}
+            </path>
+          </g>
+        </svg>
+        <VerificationSeal outcome="rejected" size={88} />
       </div>
     );
   }
@@ -81,14 +163,29 @@ function FeatureVisual({ kind }: { kind: string }) {
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
         className="feature-visual glass tilt-card"
-        style={{ background: 'linear-gradient(160deg, var(--seal-bg), transparent)', padding: 20 }}
+        style={{ background: 'linear-gradient(160deg, var(--seal-bg), transparent)' }}
       >
-        <div style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--seal-strong)', lineHeight: 2 }}>
-          <div>HTTP 402 · Payment Required</div>
-          <div>scheme: exact · asset: USDC</div>
-          <div className="mono" style={{ opacity: 0.6 }}>wallet signs → GoPlausible settles</div>
-          <div style={{ color: 'var(--success)' }}>✓ settled → semantic repair authorized</div>
-        </div>
+        <svg width="92%" viewBox="0 0 200 74" fill="none">
+          <text x="20" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">Wallet</text>
+          <text x="82" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">GoPlausible</text>
+          <text x="166" y="14" fontSize="7.5" fontFamily="var(--mono)" fill="var(--seal-strong)">Repair</text>
+          <line x1="20" y1="28" x2="180" y2="28" stroke="var(--seal-border)" strokeWidth="1.4" strokeDasharray="1 5" />
+          {[20, 100, 180].map((cx) => (
+            <circle key={cx} cx={cx} cy={28} r={6} fill="var(--seal-bg)" stroke="var(--seal-strong)" strokeWidth="1.6" />
+          ))}
+          {loop && (
+            <circle r="3.2" fill="var(--seal)">
+              <animateMotion dur="2.4s" repeatCount="indefinite" path="M20,28 L180,28" />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.9;1" dur="2.4s" repeatCount="indefinite" />
+            </circle>
+          )}
+          <text x="100" y="58" textAnchor="middle" fontSize="8" fontFamily="var(--mono)" fill="var(--success)">
+            {loop && (
+              <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.75;0.86;0.97;1" dur="2.4s" repeatCount="indefinite" />
+            )}
+            settled → repair authorized
+          </text>
+        </svg>
       </div>
     );
   }
@@ -100,14 +197,22 @@ function FeatureVisual({ kind }: { kind: string }) {
       className="feature-visual glass tilt-card"
       style={{ background: 'linear-gradient(160deg, var(--accent-bg), transparent)' }}
     >
-      <svg width="70%" viewBox="0 0 200 120" fill="none">
+      <svg width="80%" viewBox="0 0 200 90" fill="none">
         {[0, 1, 2, 3].map((i) => (
           <g key={i}>
-            <rect x={10 + i * 46} y={40} width={34} height={34} rx={6} stroke="var(--accent-strong)" strokeWidth="2" />
-            {i < 3 && <line x1={44 + i * 46} y1={57} x2={56 + i * 46} y2={57} stroke="var(--accent-strong)" strokeWidth="2" />}
+            <rect x={10 + i * 46} y={16} width={34} height={34} rx={6} stroke="var(--accent-strong)" strokeWidth="2" fill="var(--accent-bg)">
+              {loop && (
+                <animate attributeName="stroke-opacity" values="1;0.3;1" keyTimes="0;0.5;1" dur="2.8s" begin={`${i * 0.35}s`} repeatCount="indefinite" />
+              )}
+            </rect>
+            {i < 3 && (
+              <line x1={44 + i * 46} y1={33} x2={56 + i * 46} y2={33} stroke="var(--accent-strong)" strokeWidth="2" strokeDasharray="2 4">
+                {loop && <animate attributeName="stroke-dashoffset" values="0;-12" dur="1s" repeatCount="indefinite" />}
+              </line>
+            )}
           </g>
         ))}
-        <text x="100" y="100" textAnchor="middle" fontSize="9" fill="var(--accent-strong)" fontFamily="var(--mono)">
+        <text x="100" y="76" textAnchor="middle" fontSize="9" fill="var(--accent-strong)" fontFamily="var(--mono)">
           receipt hashes → Merkle root
         </text>
       </svg>
@@ -219,85 +324,77 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---------- Feature rows ---------- */}
-      <section className="container">
-        <div className="feature-timeline">
+      {/* ---------- Invariants: compact 3-up grid, no stacked scroll ---------- */}
+      <section className="container" style={{ marginBottom: 56 }}>
+        <Reveal>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Invariants</div>
+        </Reveal>
+        <div className="invariant-grid">
           {FEATURES.map((f, i) => (
-            <div className={`feature-row ${i % 2 ? 'reverse' : ''}`} key={f.title} style={{ position: 'relative' }}>
-              <Reveal variant={i % 2 ? 'right' : 'left'}>
-                <div style={{ position: 'relative' }}>
-                  <div className="feature-number">0{i + 1}</div>
-                  <span className="eyebrow">{f.eyebrow}</span>
-                  <h2 style={{ fontSize: 'var(--fs-xl)', margin: '10px 0 12px' }}>{f.title}</h2>
-                  <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', maxWidth: 460 }}>{f.body}</p>
-                </div>
-              </Reveal>
-              <Reveal variant="scale" delay={100}>
+            <Reveal key={f.title} delay={i * 80}>
+              <div className="card glass card-pad invariant-card">
                 <FeatureVisual kind={f.visual} />
-              </Reveal>
-            </div>
+                <div className="invariant-number mono">{f.eyebrow}</div>
+                <h2 style={{ fontSize: 'var(--fs-lg)', margin: '8px 0 8px' }}>{f.title}</h2>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{f.body}</p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ---------- Pipeline: horizontal scroll-snap ---------- */}
+      {/* ---------- Pipeline: no-scroll node diagram, live loop per stage ---------- */}
       <section className="container" style={{ marginTop: 24, marginBottom: 56 }}>
         <Reveal>
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             The pipeline
           </div>
         </Reveal>
-        <div className="snap-strip" style={{ position: 'relative' }}>
-          <div className="pipeline-connect" />
-          {STEPS.map((s, i) => (
-            <Reveal key={s.title} delay={i * 70}>
-              <div className="card glass card-pad" style={{ width: 260, height: '100%' }}>
-                <span className="poster-figure" style={{ fontSize: 34, color: 'var(--accent-strong)' }}>
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <h3 style={{ fontSize: 'var(--fs-lg)', margin: '10px 0 8px' }}>{s.title}</h3>
-                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.body}</p>
-              </div>
-            </Reveal>
-          ))}
-          <Reveal delay={STEPS.length * 70}>
-            <div
-              className="card card-pad"
-              style={{
-                width: 260,
-                height: '100%',
-                background: 'linear-gradient(160deg, var(--accent), var(--accent-strong))',
-                color: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-              }}
-            >
-              <p className="editorial-quote" style={{ color: '#fff', fontSize: 20, marginBottom: 8 }}>
-                "No valid proof, no execution."
-              </p>
-              <p style={{ fontSize: 12.5, opacity: 0.85 }}>
-                A downstream system checks the signature and output hash before it acts — every time.
-              </p>
-            </div>
-          </Reveal>
+        <div className="pipeline-rail">
+          {STEPS.map((s, i) => {
+            const color = PIPE_TONE_VAR[s.tone];
+            return (
+              <Fragment key={s.title}>
+                <Reveal delay={i * 70}>
+                  <div className="pipe-node" style={{ ['--pipe-tone' as string]: color }}>
+                    <div className="pipe-node-circle">
+                      <span className="pipe-node-ring" style={{ animationDelay: `${i * 0.35}s` }} />
+                      <s.icon width={22} height={22} />
+                      <span className="pipe-node-index mono">{i + 1}</span>
+                    </div>
+                    <h3 className="pipe-node-title">{s.title}</h3>
+                    <p className="pipe-node-body">{s.body}</p>
+                  </div>
+                </Reveal>
+                {i < STEPS.length - 1 && <PipeLink color={color} />}
+              </Fragment>
+            );
+          })}
         </div>
+        <Reveal delay={STEPS.length * 70}>
+          <div className="pipeline-quote">
+            <p className="editorial-quote">"No valid proof, no execution."</p>
+            <p className="pipeline-quote-sub">
+              A downstream system checks the signature and output hash before it acts — every time.
+            </p>
+          </div>
+        </Reveal>
       </section>
 
-      {/* ---------- Technology stack ---------- */}
-      <section className="container" style={{ marginBottom: 56 }}>
+      {/* ---------- Technology stack: auto-scrolling marquee ---------- */}
+      <section style={{ marginBottom: 56 }}>
         <Reveal>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Built with</div>
+          <div className="eyebrow container" style={{ marginBottom: 10 }}>Built with</div>
         </Reveal>
-        <div className="snap-strip">
-          {TECH.map((t, i) => (
-            <Reveal key={t.label} delay={i * 50}>
-              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }}>
+        <div className="marquee">
+          <div className="marquee-track">
+            {[...TECH, ...TECH].map((t, i) => (
+              <div className="card card-pad" style={{ minWidth: 140, textAlign: 'center' }} key={`${t.label}-${i}`}>
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--grotesk)' }}>{t.label}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>{t.desc}</div>
               </div>
-            </Reveal>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
@@ -306,16 +403,24 @@ export function Home() {
         <Reveal>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Use cases</div>
         </Reveal>
-        <div className="bento">
-          {USE_CASES.map((uc, i) => (
-            <Reveal key={uc.title} delay={i * 60}>
-              <div className="span-4 card card-pad">
-                <div style={{ fontSize: 24, marginBottom: 6 }}>{uc.icon}</div>
-                <h3 style={{ fontSize: 15, marginBottom: 4 }}>{uc.title}</h3>
-                <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{uc.body}</p>
-              </div>
-            </Reveal>
-          ))}
+        <div className="use-case-grid">
+          {USE_CASES.map((uc, i) => {
+            const color = USE_CASE_TONE_VAR[uc.tone];
+            return (
+              <Reveal key={uc.title} delay={i * 60}>
+                <div className="card card-pad use-case-card" style={{ ['--uc-tone' as string]: color }}>
+                  <div className="use-case-icon">
+                    <span className="use-case-icon-ring" style={{ animationDelay: `${i * 0.4}s` }} />
+                    <uc.icon width={19} height={19} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 14.5, marginBottom: 3 }}>{uc.title}</h3>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>{uc.body}</p>
+                  </div>
+                </div>
+              </Reveal>
+            );
+          })}
         </div>
       </section>
 

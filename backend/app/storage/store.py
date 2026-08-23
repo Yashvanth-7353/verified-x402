@@ -1,13 +1,29 @@
 """
-Phase 9: Local Verification Record Store (SQLite backend).
+Phase 9: Local Verification Record Store (SQLite + Postgres/Supabase, dual-write).
 
-Persists finalized verification records locally so that every verification
-request produces a durable audit trail bridging the receipt system to
-future Merkle anchoring.
+Persists finalized verification records so that every verification request
+produces a durable audit trail bridging the receipt system to future Merkle
+anchoring.
 
 Privacy invariant: raw payloads, private keys, X-PAYMENT data, and
 recovery phrases are NEVER stored. Only identifiers, hashes, outcomes,
 receipt metadata, payment references, and anchoring metadata are persisted.
+
+Backend selection:
+    - DATABASE_URL unset (typical local dev): SQLite only, at db_path.
+    - DATABASE_URL set on Render (RENDER=true is auto-injected there):
+      Postgres/Supabase only. No local SQLite mirror — Render's disk is
+      ephemeral, so a mirror there would just be a throwaway file, not a
+      real second copy.
+    - DATABASE_URL set anywhere else (e.g. you point your own machine at
+      the Supabase project): Postgres is PRIMARY (all reads and the
+      authoritative write), and every write is also mirrored, best-effort,
+      to your local SQLite file — a real, durable local copy in that case.
+      A mirror write failure is logged and does not fail the request. The
+      mirror is self-healing: each mirror write checks whether the row
+      already exists there and inserts or updates accordingly, so a
+      previously-failed or missed mirror write is caught up automatically
+      on the next write for that request_id.
 
 Architecture:
     VerificationRequest
@@ -22,13 +38,14 @@ Architecture:
 """
 from __future__ import annotations
 
-import json
 import logging
+import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel
@@ -37,7 +54,15 @@ from app.models.enums import AnchoringStatus
 from app.models.verification import VerificationResult, VerificationReceipt
 from app.models.payments import PaymentMetadata
 
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:  # psycopg2 is only required when DATABASE_URL is set
+    psycopg2 = None
+
 logger = logging.getLogger(__name__)
+
+_INTEGRITY_ERRORS = (sqlite3.IntegrityError, *((psycopg2.IntegrityError,) if psycopg2 else ()))
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +94,7 @@ class LocalVerificationRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# SQLite schema
+# Schema (compatible with both SQLite and Postgres)
 # ---------------------------------------------------------------------------
 
 _SCHEMA_SQL = """
@@ -100,6 +125,27 @@ CREATE INDEX IF NOT EXISTS idx_lvr_created_at
     ON local_verification_records(created_at);
 """
 
+_INSERT_SQL = """
+INSERT INTO local_verification_records
+(record_id, request_id, receipt_id, outcome, receipt_hash,
+ output_hash, receipt_json, result_json, payment_metadata_json,
+ anchoring_status, merkle_inclusion_ref, anchor_tx_ref, merkle_root,
+ created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_UPDATE_SQL = """
+UPDATE local_verification_records
+SET outcome = ?,
+    receipt_id = ?,
+    receipt_hash = ?,
+    output_hash = ?,
+    receipt_json = ?,
+    result_json = ?,
+    payment_metadata_json = ?
+WHERE request_id = ?
+"""
+
 
 # ---------------------------------------------------------------------------
 # Serialization helpers — deterministic JSON
@@ -124,19 +170,55 @@ def _deserialize_payment_metadata(json_str: Optional[str]) -> Optional[PaymentMe
     return PaymentMetadata.model_validate_json(json_str)
 
 
+def _insert_params(record: LocalVerificationRecord) -> tuple:
+    return (
+        str(record.record_id),
+        record.request_id,
+        record.receipt_id,
+        record.outcome,
+        record.receipt_hash,
+        record.output_hash,
+        record.receipt_json,
+        record.result_json,
+        record.payment_metadata_json,
+        record.anchoring_status.value,
+        record.merkle_inclusion_ref,
+        record.anchor_tx_ref,
+        record.merkle_root,
+        record.created_at,
+    )
+
+
+def _update_params(record: LocalVerificationRecord) -> tuple:
+    return (
+        record.outcome,
+        record.receipt_id,
+        record.receipt_hash,
+        record.output_hash,
+        record.receipt_json,
+        record.result_json,
+        record.payment_metadata_json,
+        record.request_id,
+    )
+
+
 # ---------------------------------------------------------------------------
 # LocalVerificationRecordStore
 # ---------------------------------------------------------------------------
 
 class LocalVerificationRecordStore:
     """
-    SQLite-backed store for finalized verification records.
+    Stores finalized verification records. Postgres (Supabase) is primary
+    whenever DATABASE_URL is set. On Render, that's Supabase only — no
+    local mirror, since Render's disk is ephemeral. Anywhere else with
+    DATABASE_URL set (e.g. your own machine pointed at Supabase), SQLite
+    is kept as a live, self-healing mirror. Without DATABASE_URL (typical
+    local dev), SQLite alone is used.
 
-    Thread-safe: uses a threading.Lock around all database operations
-    since SQLite in WAL mode supports concurrent reads but serialized writes.
+    Thread-safe: uses thread-local connections per dialect.
 
     Lifecycle:
-        1. save() — called after receipt generation (finalized state only)
+        1. save() / upsert() — called after receipt generation
         2. get_by_request_id() / get_by_receipt_id() — retrieval
         3. list_unanchored_records() — consumed by Phase 10 Merkle batching
         4. mark_anchored() — called by Phase 10 after successful anchoring
@@ -152,45 +234,180 @@ class LocalVerificationRecordStore:
         Initialize the store.
 
         Args:
-            db_path: Path to the SQLite database file. If None, uses
-                     a default path relative to the project backend directory.
+            db_path: Path to the SQLite database file (used as either the
+                     sole backend or the mirror, depending on DATABASE_URL).
+                     If None, uses a default path relative to the project
+                     backend directory.
         """
+        self._database_url = os.environ.get("DATABASE_URL")
+        if self._database_url and psycopg2 is None:
+            raise RuntimeError(
+                "DATABASE_URL is set but psycopg2 is not installed. "
+                "Add psycopg2-binary to requirements.txt."
+            )
+
         if db_path is None:
             # Default: backend/data/verified.db
             backend_dir = Path(__file__).resolve().parent.parent.parent
             data_dir = backend_dir / "data"
             data_dir.mkdir(exist_ok=True)
             db_path = str(data_dir / "verified.db")
+        self._sqlite_path = db_path
 
-        self._db_path = db_path
+        self._primary = "postgres" if self._database_url else "sqlite"
+        # No mirror on Render: its disk is ephemeral, so a "local" SQLite
+        # file there is a throwaway copy, not a real second database.
+        on_render = bool(os.environ.get("RENDER"))
+        self._mirror = "sqlite" if (self._primary == "postgres" and not on_render) else None
+
         self._local = threading.local()
-        self._init_db()
 
-    def _get_conn(self) -> sqlite3.Connection:
-        """Get a thread-local database connection."""
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            conn = sqlite3.connect(self._db_path)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA foreign_keys=ON")
-            self._local.conn = conn
-        return self._local.conn
+        self._init_schema(self._primary)
+        if self._mirror:
+            self._init_schema(self._mirror)
 
-    def _init_db(self):
-        """Initialize the database schema."""
-        conn = self._get_conn()
-        conn.executescript(_SCHEMA_SQL)
-        conn.commit()
-        logger.info("Local verification record store initialized at %s", self._db_path)
-
-    def close(self):
-        """Close the thread-local database connection."""
-        if hasattr(self._local, "conn") and self._local.conn is not None:
-            self._local.conn.close()
-            self._local.conn = None
+        if self._primary == "postgres":
+            host = urlparse(self._database_url).hostname
+            logger.info(
+                "Local verification record store initialized: primary=postgres@%s mirror=%s%s",
+                host,
+                self._sqlite_path if self._mirror else "none",
+                " (disabled on Render)" if on_render and not self._mirror else "",
+            )
+        else:
+            logger.info("Local verification record store initialized at %s (sqlite only)", self._sqlite_path)
 
     # -----------------------------------------------------------------------
-    # Core operations
+    # Connection / dialect plumbing
+    # -----------------------------------------------------------------------
+
+    def _conn(self, dialect: str):
+        """Get (or open) the thread-local connection for a dialect."""
+        conns = getattr(self._local, "conns", None)
+        if conns is None:
+            conns = {}
+            self._local.conns = conns
+        if conns.get(dialect) is None:
+            if dialect == "postgres":
+                conns[dialect] = psycopg2.connect(
+                    self._database_url,
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                    connect_timeout=5,
+                )
+            else:
+                conn = sqlite3.connect(self._sqlite_path)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA foreign_keys=ON")
+                conns[dialect] = conn
+        return conns[dialect]
+
+    @staticmethod
+    def _adapt_sql(dialect: str, sql: str) -> str:
+        """Convert SQLite-style `?` placeholders to psycopg2-style `%s`."""
+        if dialect == "postgres":
+            return sql.replace("?", "%s")
+        return sql
+
+    def _execute(self, dialect: str, conn, sql: str, params=()):
+        """Execute a statement, returning a cursor-like object with fetch*()."""
+        sql = self._adapt_sql(dialect, sql)
+        if dialect == "postgres":
+            cur = conn.cursor()
+            cur.execute(sql, params)
+            return cur
+        return conn.execute(sql, params)
+
+    def _init_schema(self, dialect: str):
+        conn = self._conn(dialect)
+        if dialect == "postgres":
+            cur = conn.cursor()
+            cur.execute(_SCHEMA_SQL)
+        else:
+            conn.executescript(_SCHEMA_SQL)
+        conn.commit()
+
+    def close(self):
+        """Close all thread-local database connections."""
+        conns = getattr(self._local, "conns", None)
+        if not conns:
+            return
+        for conn in conns.values():
+            if conn is not None:
+                conn.close()
+        self._local.conns = {}
+
+    # -----------------------------------------------------------------------
+    # Internal dialect-scoped read/write helpers (used for both primary and mirror)
+    # -----------------------------------------------------------------------
+
+    def _get_by_request_id_on(self, dialect: str, conn, request_id: str) -> Optional[LocalVerificationRecord]:
+        row = self._execute(
+            dialect, conn,
+            "SELECT * FROM local_verification_records WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+        return self._row_to_record(row) if row is not None else None
+
+    def _insert_on(self, dialect: str, conn, record: LocalVerificationRecord):
+        self._execute(dialect, conn, _INSERT_SQL, _insert_params(record))
+
+    def _update_on(self, dialect: str, conn, record: LocalVerificationRecord):
+        self._execute(dialect, conn, _UPDATE_SQL, _update_params(record))
+
+    def _mirror_upsert(self, record: LocalVerificationRecord):
+        """Best-effort self-healing upsert of `record` into the mirror dialect."""
+        if not self._mirror:
+            return
+        conn = self._conn(self._mirror)
+        try:
+            existing = self._get_by_request_id_on(self._mirror, conn, record.request_id)
+            if existing is not None:
+                self._update_on(self._mirror, conn, record)
+            else:
+                self._insert_on(self._mirror, conn, record)
+            conn.commit()
+        except Exception:
+            logger.warning(
+                "Mirror write to %s failed for request_id=%s (primary write succeeded; "
+                "will self-heal on next write for this request)",
+                self._mirror, record.request_id, exc_info=True,
+            )
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+    def _mirror_mark_anchored(self, record_ids: list[str], merkle_root: str, anchor_tx_ref: str):
+        if not self._mirror:
+            return
+        conn = self._conn(self._mirror)
+        try:
+            for record_id in record_ids:
+                self._execute(
+                    self._mirror, conn,
+                    """
+                    UPDATE local_verification_records
+                    SET anchoring_status = 'anchored',
+                        merkle_root = ?,
+                        anchor_tx_ref = ?
+                    WHERE record_id = ? AND anchoring_status != 'anchored'
+                    """,
+                    (merkle_root, anchor_tx_ref, record_id),
+                )
+            conn.commit()
+        except Exception:
+            logger.warning(
+                "Mirror mark_anchored to %s failed for %d record(s) (primary write succeeded)",
+                self._mirror, len(record_ids), exc_info=True,
+            )
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+    # -----------------------------------------------------------------------
+    # Core operations (operate on primary; mirror best-effort)
     # -----------------------------------------------------------------------
 
     def save(
@@ -214,8 +431,10 @@ class LocalVerificationRecordStore:
             The created LocalVerificationRecord.
 
         Raises:
-            sqlite3.IntegrityError: If request_id conflicts with an existing
-                record that has a different receipt_id (integrity conflict).
+            sqlite3.IntegrityError / psycopg2.IntegrityError: If request_id
+                conflicts with an existing record that has a different
+                receipt_id (integrity conflict). Only the primary backend's
+                integrity is authoritative for this check.
         """
         record = LocalVerificationRecord(
             record_id=uuid4(),
@@ -231,34 +450,9 @@ class LocalVerificationRecordStore:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
-        conn = self._get_conn()
+        conn = self._conn(self._primary)
         try:
-            conn.execute(
-                """
-                INSERT INTO local_verification_records
-                (record_id, request_id, receipt_id, outcome, receipt_hash,
-                 output_hash, receipt_json, result_json, payment_metadata_json,
-                 anchoring_status, merkle_inclusion_ref, anchor_tx_ref, merkle_root,
-                 created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(record.record_id),
-                    record.request_id,
-                    record.receipt_id,
-                    record.outcome,
-                    record.receipt_hash,
-                    record.output_hash,
-                    record.receipt_json,
-                    record.result_json,
-                    record.payment_metadata_json,
-                    record.anchoring_status.value,
-                    record.merkle_inclusion_ref,
-                    record.anchor_tx_ref,
-                    record.merkle_root,
-                    record.created_at,
-                ),
-            )
+            self._insert_on(self._primary, conn, record)
             conn.commit()
             logger.info(
                 "Record persisted: request_id=%s receipt_id=%s outcome=%s anchoring=%s",
@@ -267,9 +461,14 @@ class LocalVerificationRecordStore:
                 record.outcome,
                 record.anchoring_status,
             )
+            self._mirror_upsert(record)
             return record
 
-        except sqlite3.IntegrityError as e:
+        except _INTEGRITY_ERRORS as e:
+            # A Postgres transaction is aborted after an error — roll back
+            # before issuing any further query on this connection.
+            conn.rollback()
+
             # Check if it's a duplicate save (same request_id + same receipt_id)
             # or a conflict (same request_id, different receipt_id)
             existing = self.get_by_request_id(record.request_id)
@@ -312,42 +511,26 @@ class LocalVerificationRecordStore:
         request_id = str(receipt.request_id_ref)
         outcome = receipt.outcome.value
 
-        conn = self._get_conn()
+        conn = self._conn(self._primary)
+        existing = self._get_by_request_id_on(self._primary, conn, request_id)
 
-        existing = self.get_by_request_id(request_id)
         if existing is not None:
-            # UPDATE the existing record with the final state
-            conn.execute(
-                """
-                UPDATE local_verification_records
-                SET outcome = ?,
-                    receipt_id = ?,
-                    receipt_hash = ?,
-                    output_hash = ?,
-                    receipt_json = ?,
-                    result_json = ?,
-                    payment_metadata_json = ?
-                WHERE request_id = ?
-                """,
-                (
-                    outcome,
-                    str(receipt.receipt_id),
-                    receipt.receipt_hash,
-                    receipt.output_hash,
-                    _serialize_model(receipt),
-                    _serialize_model(result),
-                    _serialize_model(payment_metadata) if payment_metadata else None,
-                    request_id,
-                ),
-            )
+            updated = existing.model_copy(update={
+                "outcome": outcome,
+                "receipt_id": str(receipt.receipt_id),
+                "receipt_hash": receipt.receipt_hash,
+                "output_hash": receipt.output_hash,
+                "receipt_json": _serialize_model(receipt),
+                "result_json": _serialize_model(result),
+                "payment_metadata_json": _serialize_model(payment_metadata) if payment_metadata else None,
+            })
+            self._update_on(self._primary, conn, updated)
             conn.commit()
             logger.info(
                 "Record UPDATED: request_id=%s outcome=%s receipt_id=%s",
                 request_id, outcome, str(receipt.receipt_id),
             )
-            # Return the updated record
-            updated = self.get_by_request_id(request_id)
-            assert updated is not None
+            self._mirror_upsert(updated)
             return updated
 
         # No existing record — INSERT new
@@ -364,72 +547,24 @@ class LocalVerificationRecordStore:
             anchoring_status=AnchoringStatus.unanchored,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
-        conn.execute(
-            """
-            INSERT INTO local_verification_records
-            (record_id, request_id, receipt_id, outcome, receipt_hash,
-             output_hash, receipt_json, result_json, payment_metadata_json,
-             anchoring_status, merkle_inclusion_ref, anchor_tx_ref, merkle_root,
-             created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(record.record_id),
-                record.request_id,
-                record.receipt_id,
-                record.outcome,
-                record.receipt_hash,
-                record.output_hash,
-                record.receipt_json,
-                record.result_json,
-                record.payment_metadata_json,
-                record.anchoring_status.value,
-                record.merkle_inclusion_ref,
-                record.anchor_tx_ref,
-                record.merkle_root,
-                record.created_at,
-            ),
-        )
+        self._insert_on(self._primary, conn, record)
         conn.commit()
         logger.info(
             "Record CREATED: request_id=%s outcome=%s receipt_id=%s",
             request_id, outcome, record.receipt_id,
         )
+        self._mirror_upsert(record)
         return record
 
     def get_by_request_id(self, request_id: str) -> Optional[LocalVerificationRecord]:
-        """
-        Retrieve a record by its request_id.
-
-        Args:
-            request_id: The VerificationRequest.request_id (as string).
-
-        Returns:
-            The LocalVerificationRecord if found, None otherwise.
-        """
-        conn = self._get_conn()
-        row = conn.execute(
-            "SELECT * FROM local_verification_records WHERE request_id = ?",
-            (request_id,),
-        ).fetchone()
-
-        if row is None:
-            return None
-
-        return self._row_to_record(row)
+        """Retrieve a record by its request_id (reads from the primary backend)."""
+        return self._get_by_request_id_on(self._primary, self._conn(self._primary), request_id)
 
     def get_by_receipt_id(self, receipt_id: str) -> Optional[LocalVerificationRecord]:
-        """
-        Retrieve a record by its receipt_id.
-
-        Args:
-            receipt_id: The VerificationReceipt.receipt_id (as string).
-
-        Returns:
-            The LocalVerificationRecord if found, None otherwise.
-        """
-        conn = self._get_conn()
-        row = conn.execute(
+        """Retrieve a record by its receipt_id (reads from the primary backend)."""
+        conn = self._conn(self._primary)
+        row = self._execute(
+            self._primary, conn,
             "SELECT * FROM local_verification_records WHERE receipt_id = ?",
             (receipt_id,),
         ).fetchone()
@@ -441,7 +576,8 @@ class LocalVerificationRecordStore:
 
     def list_unanchored_records(self) -> list[LocalVerificationRecord]:
         """
-        Return all records eligible for Merkle batching (Phase 10).
+        Return all records eligible for Merkle batching (Phase 10), read
+        from the primary backend.
 
         Returns records with anchoring_status = 'unanchored', ordered by
         created_at ASC then record_id ASC for deterministic leaf ordering.
@@ -451,8 +587,9 @@ class LocalVerificationRecordStore:
 
         Does NOT mutate anchoring status while reading.
         """
-        conn = self._get_conn()
-        rows = conn.execute(
+        conn = self._conn(self._primary)
+        rows = self._execute(
+            self._primary, conn,
             """
             SELECT * FROM local_verification_records
             WHERE anchoring_status = 'unanchored'
@@ -472,17 +609,18 @@ class LocalVerificationRecordStore:
         Mark records as anchored after successful Merkle anchoring (Phase 10).
 
         Called by the Merkle Anchoring Service after a batch is anchored.
+        Applied to the primary backend; mirrored best-effort.
 
         Args:
             record_ids: List of record_id strings to mark as anchored.
             merkle_root: The Merkle root that was anchored on Algorand.
             anchor_tx_ref: The Algorand transaction reference.
         """
-        conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
+        conn = self._conn(self._primary)
 
         for record_id in record_ids:
-            conn.execute(
+            self._execute(
+                self._primary, conn,
                 """
                 UPDATE local_verification_records
                 SET anchoring_status = 'anchored',
@@ -499,14 +637,15 @@ class LocalVerificationRecordStore:
             len(record_ids),
             merkle_root[:16],
         )
+        self._mirror_mark_anchored(record_ids, merkle_root, anchor_tx_ref)
 
     # -----------------------------------------------------------------------
     # Deserialization
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_record(row: sqlite3.Row) -> LocalVerificationRecord:
-        """Convert a database row to a LocalVerificationRecord."""
+    def _row_to_record(row) -> LocalVerificationRecord:
+        """Convert a database row (sqlite3.Row or psycopg2 RealDictRow) to a LocalVerificationRecord."""
         return LocalVerificationRecord(
             record_id=UUID(row["record_id"]),
             request_id=row["request_id"],
@@ -533,7 +672,7 @@ class LocalVerificationRecordStore:
         return _deserialize_result(record.result_json)
 
     # -----------------------------------------------------------------------
-    # Frontend API support (Phase 15)
+    # Frontend API support (Phase 15) — reads from the primary backend
     # -----------------------------------------------------------------------
 
     def list_records(self, offset: int = 0, limit: int = 50) -> list[dict]:
@@ -547,8 +686,9 @@ class LocalVerificationRecordStore:
         Returns:
             List of dicts with safe metadata fields.
         """
-        conn = self._get_conn()
-        rows = conn.execute(
+        conn = self._conn(self._primary)
+        rows = self._execute(
+            self._primary, conn,
             """
             SELECT record_id, request_id, receipt_id, outcome, receipt_hash,
                    output_hash, anchoring_status, merkle_root, anchor_tx_ref,
@@ -586,7 +726,7 @@ class LocalVerificationRecordStore:
                 d["repair_type"] = None
 
             try:
-                pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+                pm = _deserialize_payment_metadata(row["payment_metadata_json"])
                 if pm:
                     d["payment_status"] = pm.payment_status.value
                     d["payment_facilitator"] = pm.facilitator
@@ -614,8 +754,9 @@ class LocalVerificationRecordStore:
         Returns:
             Dict with safe metadata fields, or None if not found.
         """
-        conn = self._get_conn()
-        row = conn.execute(
+        conn = self._conn(self._primary)
+        row = self._execute(
+            self._primary, conn,
             "SELECT * FROM local_verification_records WHERE record_id = ?",
             (record_id,),
         ).fetchone()
@@ -647,7 +788,7 @@ class LocalVerificationRecordStore:
             d["repair_type"] = None
 
         try:
-            pm = _deserialize_payment_metadata(row.get("payment_metadata_json"))
+            pm = _deserialize_payment_metadata(row["payment_metadata_json"])
             if pm:
                 d["payment_status"] = pm.payment_status.value
                 d["payment_facilitator"] = pm.facilitator

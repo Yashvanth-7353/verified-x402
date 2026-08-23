@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: verified-x402-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        sync: false
+      - key: AVM_ADDRESS
+        sync: false
+      - key: FACILITATOR_URL
+        sync: false
+      - key: ALGORAND_NETWORK
+        sync: false
+      - key: SEMANTIC_REPAIR_PRICE
+        sync: false
+      - key: SEMANTIC_REPAIR_PROVIDER
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+      - key: GROQ_TIMEOUT_SECONDS
+        sync: false
+      - key: ANCHOR_ALGOD_ADDRESS
+        sync: false
+      - key: ANCHOR_ALGOD_TOKEN
+        sync: false
+      - key: ANCHOR_PRIVATE_KEY
+        sync: false
+      - key: RECEIPT_SIGNING_PRIVATE_KEY
+        sync: false
+      - key: RECEIPT_SIGNING_PUBLIC_KEY
+        sync: false
