@@ -50,11 +50,12 @@ setup_logging()
 # ---------------------------------------------------------------------------
 # CORS configuration (Phase 14: frontend readiness)
 # ---------------------------------------------------------------------------
-_origins_raw = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+_origins_raw = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://verified402.pages.dev")
 _allowed_origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.verified402\.pages\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
