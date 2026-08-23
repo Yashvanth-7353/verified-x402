@@ -270,17 +270,24 @@ code,
   max-width: 1180px;
   width: 100%;
   justify-content: space-between;
+  transition: max-width 380ms var(--ease), gap 380ms var(--ease);
+}
+
+.dock-row.nav-scrolled {
+  max-width: 760px;
+  gap: 6px;
 }
 
 .dock-brand,
 .dock-nav,
 .dock-toggle {
   pointer-events: auto;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 10px 32px -8px rgba(20, 22, 14, 0.1), 0 2px 6px -1px rgba(20, 22, 14, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  transition: background 380ms var(--ease), backdrop-filter 380ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), padding 380ms var(--ease);
 }
 
 .dock-brand {
@@ -293,7 +300,7 @@ code,
   border-radius: 999px;
   flex-shrink: 0;
   text-decoration: none;
-  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), background 260ms var(--ease);
+  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease), height 260ms var(--ease), padding 380ms var(--ease), background 260ms var(--ease);
 }
 
 @media (max-width: 860px) {
@@ -327,7 +334,7 @@ code,
   gap: 2px;
   border-radius: 999px;
   padding: 6px;
-  transition: padding 260ms var(--ease), box-shadow 260ms var(--ease), background 260ms var(--ease);
+  transition: padding 380ms var(--ease), gap 380ms var(--ease), box-shadow 260ms var(--ease), background 260ms var(--ease);
 }
 
 .dock-pill {
@@ -367,7 +374,7 @@ code,
   text-decoration: none;
   color: var(--text-muted);
   white-space: nowrap;
-  transition: color 260ms var(--ease), background 260ms var(--ease);
+  transition: color 260ms var(--ease), background 260ms var(--ease), padding 380ms var(--ease), font-size 380ms var(--ease);
 }
 
 .dock-link:hover {
@@ -461,19 +468,25 @@ code,
 .nav-scrolled .dock-toggle {
   box-shadow: 0 16px 40px -10px rgba(20, 22, 14, 0.14), 0 3px 10px rgba(20, 22, 14, 0.05), inset 0 1px 1px 0 #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(36px) saturate(200%);
-  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(42px) saturate(210%);
+  -webkit-backdrop-filter: blur(42px) saturate(210%);
 }
 .nav-scrolled .dock-nav {
   padding: 4px;
+  gap: 0;
 }
 .nav-scrolled .dock-brand {
-  height: 46px;
+  height: 44px;
+  padding: 0 14px;
 }
 .nav-scrolled .dock-pill {
   top: 4px;
   bottom: 4px;
+}
+.nav-scrolled .dock-link {
+  padding: 7px 12px;
+  font-size: 12.5px;
 }
 
 .footer-brand {
