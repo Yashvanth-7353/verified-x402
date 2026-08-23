@@ -3,7 +3,7 @@
    Single light theme. Trust-infrastructure aesthetic: quiet, precise, technical.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Quicksand:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Quicksand:wght@500;600;700&family=Homemade+Apple&display=swap');
 
 :root {
   /* Ledger paper — cool, not the warm-cream AI default */
@@ -60,7 +60,7 @@
   --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
   --editorial: 'Instrument Serif', var(--display);
   --poster: 'Bebas Neue', var(--grotesk);
-  --landing-heading: 'Quicksand', var(--grotesk);
+  --landing-heading: 'Homemade Apple', var(--editorial);
 
   /* Fluid type scale — use these instead of ad hoc px sizes */
   --fs-xs: 12px;
@@ -1376,10 +1376,10 @@ details.tech[open] summary {
 .hero-title {
   display: block;
   font-family: var(--landing-heading);
-  font-weight: 700;
-  font-size: var(--fs-3xl);
-  line-height: 1.04;
-  letter-spacing: -0.01em;
+  font-weight: 400;
+  font-size: calc(var(--fs-3xl) * 0.82);
+  line-height: 1.3;
+  letter-spacing: 0;
   margin: 18px 0 4px;
 }
 
